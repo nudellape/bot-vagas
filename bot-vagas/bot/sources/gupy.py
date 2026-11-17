@@ -1,29 +1,37 @@
 """Fonte: portal público de vagas da Gupy (portal.gupy.io).
 
-Usa o endpoint público que alimenta o próprio portal:
-    GET https://portal.api.gupy.io/api/v1/jobs?jobName=...&limit=..&offset=..
-Não requer login. O portal lista apenas vagas com inscrições abertas, então
-"aparecer na busca" é a evidência de que a vaga está aberta naquele momento.
-
-Parâmetros opcionais como `city` e `workplaceType` reduzem o volume; se a API
-os ignorar, o filtro local garante o resultado correto.
+Usa o endpoint interno que alimenta o próprio portal (não documentado; pode mudar):
+    GET https://portal.gupy.io/api/job-search/jobs?jobName=...&limit=..&offset=..
+O endereço antigo (portal.api.gupy.io / employability-portal.gupy.io) passou a
+responder 404 em out/2026; fica como reserva caso volte.
 """
 from __future__ import annotations
 
 import logging
 import time
-from typing import Iterable
 
 import requests
 
 from ..models import Vaga
-from ..text import strip_html
+from ..text import norm, strip_html
 
 log = logging.getLogger(__name__)
 
-URL = "https://portal.api.gupy.io/api/v1/jobs"
-PAGE = 10  # tamanho de página aceito pelo portal
-HEADERS = {"User-Agent": "Mozilla/5.0 (bot pessoal de busca de estágio)", "Accept": "application/json"}
+ENDPOINTS = [
+    "https://portal.gupy.io/api/job-search/jobs",
+    "https://employability-portal.gupy.io/api/v1/jobs",
+    "https://portal.api.gupy.io/api/v1/jobs",
+]
+_endpoint_ok: str | None = None
+PAGE = 10
+HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    "Origin": "https://portal.gupy.io",
+    "Referer": "https://portal.gupy.io/",
+}
 
 MODALIDADE = {"remote": "remoto", "hybrid": "híbrido", "on-site": "presencial", "onsite": "presencial"}
 
@@ -48,20 +56,17 @@ def _to_vaga(j: dict) -> Vaga:
     )
 
 
-def buscar(job_name: str, *, city: str | None = None, workplace_type: str | None = None,
-           max_paginas: int = 15, pausa: float = 1.0, session: requests.Session | None = None) -> list[Vaga]:
-    """Busca paginada. Lança exceção se a primeira página falhar (para o chamador
-    saber que a fonte não foi consultada e não marcar vagas como encerradas)."""
-    s = session or requests.Session()
+def _paginar(url: str, job_name: str, city: str | None, max_paginas: int, pausa: float,
+             s: requests.Session) -> list[Vaga]:
     vagas: list[Vaga] = []
     for pagina in range(max_paginas):
         params = {"jobName": job_name, "limit": PAGE, "offset": pagina * PAGE}
         if city:
             params["city"] = city
-        if workplace_type:
-            params["workplaceType"] = workplace_type
-        r = s.get(URL, params=params, headers=HEADERS, timeout=30)
-        r.raise_for_status()
+        r = s.get(url, params=params, headers=HEADERS, timeout=30)
+        if getattr(r, "status_code", 200) >= 400:
+            corpo = (getattr(r, "text", "") or "")[:200].replace("\n", " ")
+            raise requests.HTTPError(f"{r.status_code} em {getattr(r, 'url', url)} | resposta: {corpo}")
         payload = r.json()
         dados = payload.get("data") or []
         vagas.extend(_to_vaga(j) for j in dados)
@@ -69,12 +74,36 @@ def buscar(job_name: str, *, city: str | None = None, workplace_type: str | None
         if not dados or len(dados) < PAGE or (total is not None and (pagina + 1) * PAGE >= total):
             break
         time.sleep(pausa)
-    log.info("gupy jobName=%r city=%r wt=%r -> %d", job_name, city, workplace_type, len(vagas))
     return vagas
 
 
+def buscar(job_name: str, *, city: str | None = None, max_paginas: int = 15, pausa: float = 1.0,
+           session: requests.Session | None = None) -> list[Vaga]:
+    s = session or requests.Session()
+    sem_acento = norm(job_name)
+    tentativas = [(job_name, city)]
+    if sem_acento != job_name.lower():
+        tentativas.append((sem_acento, city))
+    if city:
+        tentativas.append((sem_acento, None))
+    global _endpoint_ok
+    urls = [_endpoint_ok] if _endpoint_ok else ENDPOINTS
+    ultimo_erro: Exception | None = None
+    for url in urls:
+        for termo, cid in tentativas:
+            try:
+                vagas = _paginar(url, termo, cid, max_paginas, pausa, s)
+                _endpoint_ok = url
+                log.info("gupy %s jobName=%r city=%r -> %d", url, termo, cid, len(vagas))
+                return vagas
+            except Exception as e:  # noqa: BLE001
+                ultimo_erro = e
+                log.info("tentativa falhou (%s jobName=%r city=%r): %s", url, termo, cid, e)
+                time.sleep(pausa)
+    raise ultimo_erro  # type: ignore[misc]
+
+
 def coletar(cfg: dict, session: requests.Session | None = None) -> tuple[list[Vaga], list[str]]:
-    """Executa todas as consultas configuradas. Retorna (vagas, erros)."""
     b = cfg["busca"]
     loc = cfg["localizacao"]
     pausa = b.get("pausa_entre_requisicoes_seg", 1.0)
@@ -83,15 +112,13 @@ def coletar(cfg: dict, session: requests.Session | None = None) -> tuple[list[Va
     out: list[Vaga] = []
     erros: list[str] = []
 
-    consultas: Iterable[tuple[str, str | None, str | None]] = (
-        [(t, c, None) for c in loc["prioridade_1"] + loc["prioridade_2"] for t in b["gupy_termos_por_cidade"]]
-        + [(t, None, "remote") for t in b["gupy_termos_remotos"]]
-    )
-    for termo, cidade, wt in consultas:
+    consultas = ([(t, c) for c in loc["prioridade_1"] + loc["prioridade_2"] for t in b["gupy_termos_por_cidade"]]
+                 + [(t, None) for t in b["gupy_termos_remotos"]])
+    for termo, cidade in consultas:
         try:
-            out.extend(buscar(termo, city=cidade, workplace_type=wt, max_paginas=maxp, pausa=pausa, session=s))
+            out.extend(buscar(termo, city=cidade, max_paginas=maxp, pausa=pausa, session=s))
         except Exception as e:  # noqa: BLE001
-            erros.append(f"gupy '{termo}' {cidade or wt}: {e}")
-            log.warning("falha gupy %s %s: %s", termo, cidade or wt, e)
+            erros.append(f"gupy '{termo}' {cidade or 'nacional'}: {e}")
+            log.warning("falha gupy %s %s: %s", termo, cidade or "nacional", e)
         time.sleep(pausa)
     return out, erros
