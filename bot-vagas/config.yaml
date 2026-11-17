@@ -1,0 +1,91 @@
+# =====================================================================
+# Configuração do bot de vagas de estágio (Nu Dellape)
+# Edite este arquivo para ajustar termos, cidades, pesos e limiares.
+# =====================================================================
+
+perfil:
+  # Previsão de conclusão do curso (AAAA-MM). Usado para sinalizar vagas
+  # que exigem formatura antes dessa data.
+  formatura: "2028-12"
+  # Nota mínima para gerar alerta (0-100). Todas as vagas ficam na planilha;
+  # só as acima do limiar viram mensagem.
+  limiar_alerta: 55
+
+localizacao:
+  # Barão Geraldo é distrito de Campinas: vagas lá aparecem como "Campinas".
+  prioridade_1: [Campinas, Paulínia, Sumaré]
+  prioridade_2: [Hortolândia, Jaguariúna, Valinhos, Vinhedo, Indaiatuba,
+                 Americana, Nova Odessa, Cosmópolis, Holambra, Itatiba,
+                 Santa Bárbara d'Oeste, Pedreira, Monte Mor]
+
+busca:
+  # Janela máxima de publicação (dias). Vagas até 7 dias são marcadas "recente".
+  janela_dias: 30
+  recente_dias: 7
+
+  # Gupy: para cada cidade das prioridades 1 e 2, busca TODOS os estágios
+  # (não só os com "agrícola" no título). A pontuação decide o que importa.
+  gupy_termos_por_cidade: ["estágio", "estagiário", "estagiária", "internship", "intern"]
+
+  # Gupy: buscas nacionais para vagas REMOTAS (prioridade 3).
+  gupy_termos_remotos:
+    - estágio dados
+    - estágio BI
+    - estágio business intelligence
+    - estágio planejamento
+    - estágio PMO
+    - estágio projetos
+    - estágio processos
+    - estágio operações
+    - estágio melhoria contínua
+    - estágio sustentabilidade
+    - estágio agronegócio
+    - estágio supply chain
+    - estágio controladoria
+    - data intern
+    - project intern
+    - operations intern
+
+  # Limite de páginas por consulta (proteção contra loops / excesso de requisições)
+  max_paginas: 15
+  pausa_entre_requisicoes_seg: 1.0
+
+# ---------------------------------------------------------------------
+# Páginas de carreira em Workday (opcional).
+# Muitas multinacionais (agro, química, energia) usam Workday.
+# Como achar os valores: abra a página de vagas da empresa no navegador.
+# Se o endereço for  https://EMPRESA.wd3.myworkdayjobs.com/pt-BR/SITE
+#   host   = EMPRESA.wd3.myworkdayjobs.com
+#   tenant = EMPRESA
+#   site   = SITE
+# Confira no navegador antes de adicionar; não há como o bot adivinhar.
+# ---------------------------------------------------------------------
+workday: []
+#  - empresa: "Nome da Empresa"
+#    host: "empresa.wd3.myworkdayjobs.com"
+#    tenant: "empresa"
+#    site: "Careers"
+#    termos: ["estágio", "intern"]
+
+# ---------------------------------------------------------------------
+# Pontuação (rubrica do prompt: 30/25/20/15/10)
+# ---------------------------------------------------------------------
+areas:
+  muito_alta: [dados, "data analytics", "data analyst", "data science", "data intern", analytics,
+               "business intelligence", bi, "power bi",
+               planejamento, planning, pmo, projeto, project, processo, process,
+               operações, operacoes, operations, "melhoria contínua", "melhoria continua",
+               "continuous improvement", lean, "excelência operacional", "excelencia operacional",
+               "controle de projetos", pcp, kpi, indicadores]
+  alta: [agrícola, agricola, agronegócio, agronegocio, agro, "agricultura de precisão",
+         agronomia, sustentabilidade, sustainability, "meio ambiente", ambiental,
+         environmental, ehs, sso, esg, "saúde e segurança"]
+  media: [supply, logística, logistica, logistics, "p&d", "r&d", pesquisa, research,
+          qualidade, quality, controladoria, controlling, finanças, financas, finance,
+          financeiro, custos, automação, automacao, automation, compras, procurement]
+
+# Termos que indicam incompatibilidade forte com o perfil (reduz a nota de atividades)
+areas_fora_do_perfil: [direito, jurídico, juridico, enfermagem, medicina, odontologia,
+                       nutrição, psicologia, pedagogia, "ensino médio", "nível técnico",
+                       "curso técnico", "estágio técnico", vendas, comercial, "call center",
+                       design gráfico, jornalismo, publicidade]
