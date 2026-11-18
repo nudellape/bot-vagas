@@ -133,6 +133,15 @@ empresas_alvo:
   - {polo: "Sumaré / Hortolândia / Jaguariúna / Valinhos", nome: "Eaton", cidade: "Valinhos", setor: "Gestão de energia", busca: "Eaton", apelidos: [eaton]}
 
 # ---------------------------------------------------------------------
+# Google Alertas (entregues como Feed RSS) — descobre programas de estágio
+# novos em qualquer empresa. Cole aqui o endereço de cada feed.
+# Exemplo:
+#   - {busca: "programa de estágio 2027 Campinas", cidade: "Campinas",
+#      feed: "https://www.google.com/alerts/feeds/0000000000/1111111111"}
+# ---------------------------------------------------------------------
+alertas_google: []
+
+# ---------------------------------------------------------------------
 # Vigia de páginas de carreira: o bot confere todo dia se a página mudou
 # (só olha linhas que falam de estágio/vagas/inscrições) e avisa no Telegram.
 # Para acrescentar: copie uma linha e troque nome, url e cidade.

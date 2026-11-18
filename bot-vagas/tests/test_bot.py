@@ -262,3 +262,26 @@ def test_vigia_detecta_linhas_novas(tmp_path):
     assert mud3 == [] and res3[0]["situacao"] == "sem novidades" and res3[0]["mudou_em"] == "18/11/2026"
     _, _, res4 = vigia.verificar(pag, {}, "19/11/2026", S("<div id=root></div>"))
     assert "JavaScript" in res4[0]["situacao"]
+
+
+ALERTA = """<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Google Alert</title>
+<entry><title type="html">&lt;b&gt;Programa de Estágio&lt;/b&gt; 2027 Solvay Paulínia: inscrições abertas</title>
+<link href="https://www.google.com/url?rct=j&amp;sa=t&amp;url=https://www.solvay.com/pt-br/estagio-2027&amp;ct=ga"/>
+<published>2026-11-16T10:00:00Z</published>
+<content type="html">A Solvay abriu o &lt;b&gt;programa de estágio&lt;/b&gt; em Paulínia. Inscrições até 05/12.</content></entry>
+<entry><title type="html">Jovem aprendiz em Campinas</title><link href="https://www.google.com/url?url=https://x.com/a"/>
+<published>2026-11-16T10:00:00Z</published><content type="html">estágio jovem aprendiz</content></entry>
+<entry><title type="html">Programa de estágio encerrado Campinas</title><link href="https://www.google.com/url?url=https://x.com/b"/>
+<published>2026-10-01T10:00:00Z</published><content type="html">inscrições até 10/10</content></entry>
+</feed>""".encode()
+
+
+def test_google_alertas():
+    from bot.sources import alertas_google
+    vagas = alertas_google.ler_feed(ALERTA, ["Campinas", "Paulínia"], "", HOJE)
+    assert len(vagas) == 1
+    v = vagas[0]
+    assert v.link == "https://www.solvay.com/pt-br/estagio-2027" and v.cidade == "Paulínia"
+    assert v.prazo == "2026-12-05" and v.empresa == "solvay.com" and analise.eh_alvo(v, CFG)
+    assert analise.tipo_vaga(v) == "Programa de estágio"

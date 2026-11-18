@@ -233,6 +233,8 @@ def dentro_da_janela(v: Vaga, cfg: dict, hoje: date | None = None) -> bool:
 
 def tipo_vaga(v: Vaga) -> str:
     t = norm(v.titulo)
+    if v.fonte == "google_alertas":
+        return "Programa de estágio"
     if eh_estagio(v):
         return "Estágio"
     if "trainee" in t:
