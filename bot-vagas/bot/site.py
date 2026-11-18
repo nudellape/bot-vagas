@@ -47,6 +47,9 @@ def gerar_site(linhas: list[dict], novas: list[dict], empresas: list[dict], agor
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(html, encoding="utf-8")
     (p.parent / ".nojekyll").write_text("", encoding="utf-8")
+    # mesmos dados em JSON, para outros apps (ex.: Lovable) lerem:
+    # https://nudellape.github.io/bot-vagas/vagas.json
+    (p.parent / "vagas.json").write_text(json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
     return str(p)
 
 
