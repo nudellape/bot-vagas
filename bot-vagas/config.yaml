@@ -139,7 +139,11 @@ empresas_alvo:
 #   - {busca: "programa de estágio 2027 Campinas", cidade: "Campinas",
 #      feed: "https://www.google.com/alerts/feeds/0000000000/1111111111"}
 # ---------------------------------------------------------------------
-alertas_google: []
+alertas_google:
+  - {feed: "https://www.google.com/alerts/feeds/10433589678181417577/18057160637823331051"}
+  - {feed: "https://www.google.com/alerts/feeds/10433589678181417577/10873403024652605531"}
+  - {feed: "https://www.google.com/alerts/feeds/10433589678181417577/15063275063970787400"}
+  - {feed: "https://www.google.com/alerts/feeds/10433589678181417577/5493851407422404863"}
 
 # ---------------------------------------------------------------------
 # Vigia de páginas de carreira: o bot confere todo dia se a página mudou
