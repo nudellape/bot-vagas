@@ -133,6 +133,22 @@ empresas_alvo:
   - {polo: "Sumaré / Hortolândia / Jaguariúna / Valinhos", nome: "Eaton", cidade: "Valinhos", setor: "Gestão de energia", busca: "Eaton", apelidos: [eaton]}
 
 # ---------------------------------------------------------------------
+# Vigia de páginas de carreira: o bot confere todo dia se a página mudou
+# (só olha linhas que falam de estágio/vagas/inscrições) e avisa no Telegram.
+# Para acrescentar: copie uma linha e troque nome, url e cidade.
+# ---------------------------------------------------------------------
+vigia:
+  - {nome: "OMC Group: Programa OMC Next", cidade: "Valinhos", url: "https://www.omcigroup.com/pt/carreiras/programa-de-estagio/", obs: "30h/semana, engenharia"}
+  - {nome: "CPqD", cidade: "Campinas (Polo II)", url: "https://www.cpqd.com.br/", obs: "Programa de Estágio anual, tecnologia e dados"}
+  - {nome: "Embrapa: estágios (inclui Agricultura Digital e Territorial)", cidade: "Campinas", url: "https://portaldxp-p.sede.embrapa.br/estagios"}
+  - {nome: "CNPEM / LNBR: vagas para graduação", cidade: "Campinas (Polo II)", url: "https://lnbr.cnpem.br/positions-available/graduate-undergraduate-positions-available"}
+  - {nome: "Parque Científico e Tecnológico da Unicamp", cidade: "Campinas (Barão Geraldo)", url: "https://parque.inova.unicamp.br/"}
+  - {nome: "Braskem: Programa de Estágio", cidade: "Paulínia e outras", url: "https://braskem.academiadouniversitario.com.br/"}
+  - {nome: "Raízen: Programa de Estágio", cidade: "Paulínia e outras", url: "https://estagioraizen.com/"}
+  - {nome: "Syngenta: vagas", cidade: "Paulínia", url: "https://jobs.syngenta.com/"}
+  - {nome: "Solvay: vagas", cidade: "Paulínia", url: "https://careers.solvay.com/"}
+
+# ---------------------------------------------------------------------
 # Pontuação (rubrica do prompt: 30/25/20/15/10)
 # ---------------------------------------------------------------------
 areas:

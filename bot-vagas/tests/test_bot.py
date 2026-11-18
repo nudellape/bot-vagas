@@ -237,3 +237,28 @@ def test_agrobase_ignora_bolsas_e_empresas_nao_confundem():
     assert agrobase.ler_feed(rss, False, {"jaguariuna"}, HOJE, 21) == []
     linhas = [{"Empresa": "Shellfish Ltda", "Vaga": "x", "Nota": 50, "Status": "nova", "Verificação": "aberta"}]
     assert painel._conta(linhas, ["shell"]) == (0, 0)
+
+
+def test_vigia_detecta_linhas_novas(tmp_path):
+    from bot import vigia
+
+    class R:
+        def __init__(s, t): s.text = t
+        def raise_for_status(s): pass
+
+    class S:
+        def __init__(s, t): s.t = t
+        def get(s, url, **k): return R(s.t)
+
+    pag = [{"nome": "OMC", "url": "https://x/estagio", "cidade": "Valinhos"}]
+    dia1 = "<html><body><h1>Carreiras</h1><p>Programa de estágio 2026 encerrado</p><script>var vaga=1</script></body></html>"
+    dia2 = dia1.replace("</body>", "<p>Inscrições abertas: Programa de Estágio 2027, 30h semanais</p></body>")
+    est1, mud1, res1 = vigia.verificar(pag, {}, "17/11/2026", S(dia1))
+    assert mud1 == [] and res1[0]["situacao"] == "primeira leitura"
+    vigia.gravar_estado(est1, caminho=str(tmp_path / "v.json"))
+    est2, mud2, res2 = vigia.verificar(pag, vigia.ler_estado(caminho=str(tmp_path / "v.json")), "18/11/2026", S(dia2))
+    assert len(mud2) == 1 and "2027" in mud2[0] and res2[0]["mudou_em"] == "18/11/2026"
+    _, mud3, res3 = vigia.verificar(pag, est2, "19/11/2026", S(dia2))
+    assert mud3 == [] and res3[0]["situacao"] == "sem novidades" and res3[0]["mudou_em"] == "18/11/2026"
+    _, _, res4 = vigia.verificar(pag, {}, "19/11/2026", S("<div id=root></div>"))
+    assert "JavaScript" in res4[0]["situacao"]

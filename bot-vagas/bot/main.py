@@ -123,6 +123,17 @@ def main(argv: list[str] | None = None) -> int:
     reg = registro.abrir_registro()
     linhas, novas, mudancas = registro.mesclar(reg.ler(), vagas, fontes_ok, hoje.isoformat(), ids_abertos)
     reg.gravar(linhas)
+
+    resumo_vigia = []
+    try:
+        from . import vigia
+        plan = getattr(reg, "planilha", None)
+        estado, avisos_vigia, resumo_vigia = vigia.verificar(cfg.get("vigia") or [], vigia.ler_estado(plan),
+                                                             hoje.strftime("%d/%m/%Y"))
+        vigia.gravar_estado(estado, plan)
+        mudancas += avisos_vigia
+    except Exception as e:  # noqa: BLE001
+        log.warning("vigia de páginas falhou: %s", e)
     try:
         from .painel import atualizar_painel
         if hasattr(reg, "planilha"):
@@ -132,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from .site import gerar_site
         caminho = gerar_site(linhas, novas, cfg.get("empresas_alvo") or [], agora,
-                             os.getenv("SITE_PATH", "_site/index.html"))
+                             os.getenv("SITE_PATH", "_site/index.html"), resumo_vigia)
         log.info("site gerado em %s", caminho)
     except Exception as e:  # noqa: BLE001
         log.warning("site não gerado: %s", e)

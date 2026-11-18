@@ -12,7 +12,8 @@ from pathlib import Path
 from .text import contains_any, norm
 
 
-def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora: datetime) -> dict:
+def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora: datetime,
+           paginas: list[dict] | None = None) -> dict:
     vagas = []
     for r in linhas:
         if str(r.get("Verificação", "")).startswith("não listada"):
@@ -35,12 +36,12 @@ def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora:
         emp.append({"polo": e["polo"], "nome": e["nome"], "cidade": e.get("cidade", ""), "setor": e.get("setor", ""),
                     "busca": e.get("busca", e["nome"]), "n": n})
     return {"atualizado": agora.strftime("%d/%m/%Y às %H:%M"), "hoje": agora.strftime("%Y-%m-%d"),
-            "vagas": vagas, "empresas": emp}
+            "vagas": vagas, "empresas": emp, "paginas": paginas or []}
 
 
 def gerar_site(linhas: list[dict], novas: list[dict], empresas: list[dict], agora: datetime,
-               destino: str = "_site/index.html") -> str:
-    dados = _dados(linhas, {r.get("ID") for r in novas}, empresas, agora)
+               destino: str = "_site/index.html", paginas: list[dict] | None = None) -> str:
+    dados = _dados(linhas, {r.get("ID") for r in novas}, empresas, agora, paginas)
     js = json.dumps(dados, ensure_ascii=False).replace("</", "<\\/")
     html = MODELO.replace("__DADOS__", js)
     p = Path(destino)
@@ -135,6 +136,12 @@ details dd{margin:0}
 .emp .n.zero{color:var(--palha);font-weight:600;font-size:.9rem}
 .emp .links{grid-column:1/-1;display:flex;gap:14px;font-size:.9rem}
 .emp .links a{color:var(--lavoura);font-weight:600}
+.pag{background:var(--folha);border:1px solid var(--sulco);border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.pag.mudou{border-color:var(--lavoura);box-shadow:inset 4px 0 0 var(--lavoura)}
+.pag h3{margin:0;font:700 1.05rem "Bricolage Grotesque",sans-serif}
+.pag .sit{font-size:.88rem;color:var(--terra);margin:2px 0 8px}
+.pag ul{margin:0 0 10px;padding-left:18px;font-size:.9rem}
+.pag li.nova{color:var(--lavoura);font-weight:600}
 @media (prefers-reduced-motion:reduce){.haste i{transition:none}}
 @media (max-width:420px){.cartao{grid-template-columns:46px 1fr;gap:0 12px}.planta{padding-left:10px}}
 </style>
@@ -149,7 +156,8 @@ details dd{margin:0}
 
 <nav class="abas" role="tablist">
   <button role="tab" aria-selected="true" data-aba="vagas">Vagas</button>
-  <button role="tab" aria-selected="false" data-aba="empresas">Empresas da região</button>
+  <button role="tab" aria-selected="false" data-aba="empresas">Empresas</button>
+  <button role="tab" aria-selected="false" data-aba="paginas">Páginas</button>
 </nav>
 
 <section id="aba-vagas">
@@ -162,6 +170,11 @@ details dd{margin:0}
   </div>
   <p class="contagem" id="contagem" aria-live="polite"></p>
   <div id="lista"></div>
+</section>
+
+<section id="aba-paginas" hidden>
+  <p class="resumo">Páginas de carreira que o radar confere todo dia. Quando aparece texto novo sobre estágio ou inscrições, a página fica marcada como "mudou" e você recebe aviso no Telegram.</p>
+  <div id="paginas"></div>
 </section>
 
 <section id="aba-empresas" hidden>
@@ -291,10 +304,22 @@ document.getElementById("lista").addEventListener("click", e => {
   }).join("");
 })();
 
+(function(){
+  const el = document.getElementById("paginas");
+  const ps = (D.paginas || []).slice().sort((a, b) => (b.novas.length > 0) - (a.novas.length > 0));
+  el.innerHTML = ps.length ? ps.map(p => {
+    const mudou = p.novas && p.novas.length;
+    const itens = (mudou ? p.novas.map(t => `<li class="nova">${esc(t)}</li>`) : (p.trechos || []).slice(0, 4).map(t => `<li>${esc(t)}</li>`)).join("");
+    return `<div class="pag ${mudou ? "mudou" : ""}"><h3>${esc(p.nome)}</h3>
+      <div class="sit">${esc(p.cidade)}${p.obs ? ", " + esc(p.obs) : ""}. ${esc(p.situacao.charAt(0).toUpperCase() + p.situacao.slice(1))}${p.mudou_em ? ` (última mudança em ${esc(p.mudou_em)})` : ""}</div>
+      ${itens ? `<ul>${itens}</ul>` : ""}
+      <a class="ver" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Abrir página</a></div>`;
+  }).join("") : `<div class="vazio">Nenhuma página cadastrada no vigia.</div>`;
+})();
+
 document.querySelectorAll("nav.abas button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav.abas button").forEach(x => x.setAttribute("aria-selected", x === b));
-  document.getElementById("aba-vagas").hidden = b.dataset.aba !== "vagas";
-  document.getElementById("aba-empresas").hidden = b.dataset.aba !== "empresas";
+  ["vagas", "empresas", "paginas"].forEach(a => document.getElementById("aba-" + a).hidden = b.dataset.aba !== a);
 });
 desenhar();
 </script>
