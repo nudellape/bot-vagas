@@ -244,11 +244,17 @@ def tipo_vaga(v: Vaga) -> str:
     return "Emprego"
 
 
+def titulo_excluido(titulo: str, cfg: dict) -> bool:
+    """True se o título tem algum termo de busca.excluir_titulos (palavra inteira)."""
+    t = norm(titulo)
+    termos = [x.strip() for x in cfg.get("busca", {}).get("excluir_titulos", [])]
+    return bool(contains_any(t, termos))
+
+
 def eh_alvo(v: Vaga, cfg: dict) -> bool:
     """Estágio sempre; emprego só se incluir_empregos e o cargo for de entrada."""
     b = cfg.get("busca", {})
-    t = f" {norm(v.titulo)} "
-    if any(f" {norm(x).strip()}" in t if x.startswith(" ") else norm(x) in t for x in b.get("excluir_titulos", [])):
+    if titulo_excluido(v.titulo, cfg):
         return False
     if "apprentice" in (v.tipo or "").lower():
         return False

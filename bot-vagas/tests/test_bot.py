@@ -285,3 +285,14 @@ def test_google_alertas():
     assert v.link == "https://www.solvay.com/pt-br/estagio-2027" and v.cidade == "Paulínia"
     assert v.prazo == "2026-12-05" and v.empresa == "solvay.com" and analise.eh_alvo(v, CFG)
     assert analise.tipo_vaga(v) == "Programa de estágio"
+
+
+def test_exclusoes_fora_do_perfil():
+    def v(t):
+        return gupy._to_vaga(job(1, t, tipo="vacancy_type_effective"))
+    assert not analise.eh_alvo(v("AGENTE OPERAÇÕES LEVES (MANOBRISTA/ASSISTENTE)"), CFG)
+    assert not analise.eh_alvo(v("Vendedora Interna"), CFG)
+    assert not analise.eh_alvo(v("Operador de Caixa"), CFG)
+    assert analise.eh_alvo(v("Analista de Fluxo de Caixa Jr"), CFG)
+    assert analise.eh_alvo(v("Analista Plan Estoque JR"), CFG)
+    assert analise.eh_alvo(gupy._to_vaga(job(2, "Estágio em Liderança e Processos")), CFG)

@@ -32,7 +32,15 @@ busca:
   # Títulos com estes termos são descartados (cargo acima do nível de entrada ou fora do alvo)
   excluir_titulos: [pleno, sênior, senior, " sr ", " sr.", especialista, coordenador, coordenadora,
                     gerente, supervisor, supervisora, líder, lider, diretor, diretora, head,
-                    "jovem aprendiz", aprendiz, "pcd exclusiva"]
+                    "jovem aprendiz", aprendiz, "pcd exclusiva",
+                    # fora do perfil (a Nu pediu para nunca mostrar):
+                    manobrista, motorista, motoboy, entregador, atendente, recepcionista,
+                    vendedor, vendedora, "consultor de vendas", "consultora de vendas",
+                    "representante comercial", promotor, promotora, repositor, repositora,
+                    "operador de caixa", "operadora de caixa", telemarketing, "call center",
+                    "operador de produção", "operadora de produção", "auxiliar de produção",
+                    "ajudante geral", "auxiliar de limpeza", porteiro, vigilante, cozinheiro, garçom,
+                    "operador de empilhadeira", "técnico de enfermagem", "auxiliar de enfermagem"]
 
   # Gupy: buscas nacionais para vagas REMOTAS (prioridade 3).
   gupy_termos_remotos:
