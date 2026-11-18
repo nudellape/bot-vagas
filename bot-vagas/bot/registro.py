@@ -18,11 +18,13 @@ from pathlib import Path
 
 from .models import Vaga
 
+# Ordem pensada para leitura: o que importa primeiro; colunas técnicas no fim (ocultas).
 COLUNAS = [
-    "ID", "Fonte", "Empresa", "Vaga", "Cidade", "Modalidade", "Carga horária", "Cursos aceitos",
-    "Bolsa e benefícios", "Publicação", "Prazo", "Nota", "Detalhe da nota", "Alertas", "Link",
-    "Verificação", "Data da descoberta", "Última vez vista", "Status", "Minhas notas",
+    "Nota", "Status", "Empresa", "Vaga", "Cidade", "Modalidade", "Prazo", "Link", "Alertas",
+    "Carga horária", "Cursos aceitos", "Bolsa e benefícios", "Publicação", "Minhas notas",
+    "Detalhe da nota", "Verificação", "Data da descoberta", "Última vez vista", "Fonte", "ID",
 ]
+PRIMEIRA_OCULTA = COLUNAS.index("Detalhe da nota")
 STATUS_VALIDOS = ["nova", "analisar", "candidatura enviada", "entrevista", "encerrada", "descartada"]
 COLUNAS_DA_NU = {"Status", "Minhas notas"}
 
@@ -30,7 +32,7 @@ COLUNAS_DA_NU = {"Status", "Minhas notas"}
 def vaga_para_linha(v: Vaga, hoje: str) -> dict:
     return {
         "ID": v.id, "Fonte": v.fonte, "Empresa": v.empresa, "Vaga": v.titulo,
-        "Cidade": ", ".join(x for x in [v.cidade, v.estado] if x) or "não informada",
+        "Cidade": v.cidade or ("remoto" if v.modalidade == "remoto" else "não informada"),
         "Modalidade": v.modalidade or "não informada",
         "Carga horária": v.carga_horaria, "Cursos aceitos": v.cursos_aceitos,
         "Bolsa e benefícios": v.bolsa_beneficios,
@@ -44,12 +46,6 @@ def vaga_para_linha(v: Vaga, hoje: str) -> dict:
 
 def mesclar(existentes: list[dict], encontradas: list[Vaga], fontes_ok: set[str], hoje: str,
             ids_abertos: set[str] | None = None):
-    """Retorna (linhas_finais, novas, mudancas).
-    encontradas = vagas filtradas para registrar/atualizar.
-    ids_abertos = TODOS os IDs devolvidos pelas fontes (inclusive fora dos filtros),
-                  usados para decidir se uma vaga registrada continua aberta.
-    fontes_ok   = prefixos de ID cuja consulta foi completa (ex.: {'gupy:'});
-                  só eles podem marcar vagas como sumidas."""
     ids_abertos = set(ids_abertos or ()) | {v.id for v in encontradas}
     por_id = {r["ID"]: dict(r) for r in existentes if r.get("ID")}
     novas: list[dict] = []
@@ -85,11 +81,11 @@ def mesclar(existentes: list[dict], encontradas: list[Vaga], fontes_ok: set[str]
             elif r.get("Status") in ("candidatura enviada", "entrevista"):
                 mudancas.append(f"{r.get('Empresa')} | {r.get('Vaga')}: saiu da fonte; seu status '{r.get('Status')}' foi mantido")
 
-    linhas = sorted(por_id.values(), key=lambda r: (-int(r.get("Nota") or 0), r.get("Empresa", "")))
+    fim = {"encerrada", "descartada"}
+    linhas = sorted(por_id.values(), key=lambda r: (r.get("Status") in fim, -int(r.get("Nota") or 0),
+                                                    r.get("Empresa", "")))
     return linhas, novas, mudancas
 
-
-# ------------------------------------------------------------- back-ends
 
 class RegistroCSV:
     def __init__(self, caminho: str = "dados/vagas.csv"):
@@ -110,48 +106,123 @@ class RegistroCSV:
 
 
 class RegistroSheets:
-    """Planilha Google. Usa conta de serviço (JSON na variável GOOGLE_SERVICE_ACCOUNT_JSON)
-    e o ID da planilha em SHEET_ID. A aba 'Vagas' é criada se não existir."""
-
     ABA = "Vagas"
 
     def __init__(self, sheet_id: str, credenciais_json: str):
-        import gspread  # import tardio: só exige a lib quando usar Sheets
+        import gspread
         from google.oauth2.service_account import Credentials
 
         creds = Credentials.from_service_account_info(
             json.loads(credenciais_json), scopes=["https://www.googleapis.com/auth/spreadsheets"])
         self.planilha = gspread.authorize(creds).open_by_key(sheet_id)
+        self.precisa_formatar = False
         try:
             self.aba = self.planilha.worksheet(self.ABA)
         except gspread.WorksheetNotFound:
-            self.aba = self.planilha.add_worksheet(self.ABA, rows=1000, cols=len(COLUNAS))
-            self._formatar()
-
-    def _formatar(self):
-        self.aba.update([COLUNAS], "A1")
-        self.aba.freeze(rows=1)
-        self.aba.format("1:1", {"textFormat": {"bold": True}})
-        # lista suspensa na coluna Status
-        col = COLUNAS.index("Status")
-        self.planilha.batch_update({"requests": [{"setDataValidation": {
-            "range": {"sheetId": self.aba.id, "startRowIndex": 1, "startColumnIndex": col, "endColumnIndex": col + 1},
-            "rule": {"condition": {"type": "ONE_OF_LIST",
-                                   "values": [{"userEnteredValue": s} for s in STATUS_VALIDOS]},
-                     "showCustomUi": True, "strict": False}}}]})
+            self.aba = self.planilha.add_worksheet(self.ABA, rows=1000, cols=len(COLUNAS), index=0)
+            self.precisa_formatar = True
 
     def ler(self) -> list[dict]:
-        if self.aba.row_values(1) != COLUNAS:  # aba vazia ou criada à mão
-            self._formatar()
+        cab = self.aba.row_values(1)
+        if cab != COLUNAS:
+            self.precisa_formatar = True
+        if not cab:
             return []
-        return self.aba.get_all_records(expected_headers=COLUNAS, default_blank="")
+        return self.aba.get_all_records(default_blank="")
 
     def gravar(self, linhas: list[dict]) -> None:
         valores = [COLUNAS] + [[r.get(c, "") for c in COLUNAS] for r in linhas]
         if self.aba.row_count < len(valores):
             self.aba.add_rows(len(valores) - self.aba.row_count + 100)
-        self.aba.batch_clear([f"A2:T{max(self.aba.row_count, 2)}"])
+        if self.aba.col_count < len(COLUNAS):
+            self.aba.add_cols(len(COLUNAS) - self.aba.col_count)
+        from gspread.utils import rowcol_to_a1
+        self.aba.batch_clear([f"A1:{rowcol_to_a1(self.aba.row_count, max(len(COLUNAS), self.aba.col_count))}"])
         self.aba.update(valores, "A1", value_input_option="RAW")
+        if self.precisa_formatar:
+            self._formatar(len(valores))
+
+    def _formatar(self, n_linhas: int):
+        sid = self.aba.id
+        ncol = len(COLUNAS)
+        col = COLUNAS.index
+        larguras = {"Nota": 55, "Status": 150, "Empresa": 170, "Vaga": 330, "Cidade": 110,
+                    "Modalidade": 95, "Prazo": 90, "Link": 90, "Alertas": 260, "Carga horária": 100,
+                    "Cursos aceitos": 200, "Bolsa e benefícios": 220, "Publicação": 90, "Minhas notas": 220}
+
+        def faixa(c0, c1=None, r0=0, r1=None):
+            d = {"sheetId": sid, "startColumnIndex": c0, "endColumnIndex": (c1 if c1 is not None else c0 + 1),
+                 "startRowIndex": r0}
+            if r1 is not None:
+                d["endRowIndex"] = r1
+            return d
+
+        def cor(h):
+            h = h.lstrip("#")
+            return {"red": int(h[0:2], 16) / 255, "green": int(h[2:4], 16) / 255, "blue": int(h[4:6], 16) / 255}
+
+        def regra(formula, fmt):
+            return {"addConditionalFormatRule": {"index": 0, "rule": {
+                "ranges": [faixa(0, ncol, 1)],
+                "booleanRule": {"condition": {"type": "CUSTOM_FORMULA", "values": [{"userEnteredValue": formula}]},
+                                "format": fmt}}}}
+
+        meta = self.planilha.fetch_sheet_metadata()
+        aba_meta = next(x for x in meta["sheets"] if x["properties"]["sheetId"] == sid)
+        req = [{"deleteConditionalFormatRule": {"sheetId": sid, "index": 0}}
+               for _ in aba_meta.get("conditionalFormats", [])]
+        if aba_meta.get("basicFilter"):
+            req.append({"clearBasicFilter": {"sheetId": sid}})
+
+        req += [
+            {"updateSheetProperties": {"properties": {"sheetId": sid, "gridProperties": {
+                "frozenRowCount": 1, "frozenColumnCount": 4}},
+                "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount"}},
+            {"repeatCell": {"range": faixa(0, ncol, 1), "cell": {"userEnteredFormat": {
+                "wrapStrategy": "CLIP", "verticalAlignment": "MIDDLE", "textFormat": {"fontSize": 10}}},
+                "fields": "userEnteredFormat(wrapStrategy,verticalAlignment,textFormat)"}},
+            {"repeatCell": {"range": faixa(0, ncol, 0, 1), "cell": {"userEnteredFormat": {
+                "backgroundColor": cor("#1f3b4d"), "horizontalAlignment": "CENTER", "verticalAlignment": "MIDDLE",
+                "wrapStrategy": "WRAP",
+                "textFormat": {"bold": True, "foregroundColor": cor("#ffffff"), "fontSize": 10}}},
+                "fields": "userEnteredFormat"}},
+            {"repeatCell": {"range": faixa(col("Nota"), None, 1), "cell": {"userEnteredFormat": {
+                "horizontalAlignment": "CENTER", "textFormat": {"bold": True, "fontSize": 12}}},
+                "fields": "userEnteredFormat(horizontalAlignment,textFormat)"}},
+            {"repeatCell": {"range": faixa(col("Alertas"), None, 1), "cell": {"userEnteredFormat": {
+                "textFormat": {"foregroundColor": cor("#a61b1b"), "fontSize": 9}}},
+                "fields": "userEnteredFormat.textFormat"}},
+            {"updateDimensionProperties": {"range": {"sheetId": sid, "dimension": "ROWS", "startIndex": 0,
+                                                     "endIndex": 1},
+                                           "properties": {"pixelSize": 36}, "fields": "pixelSize"}},
+            {"updateDimensionProperties": {"range": {"sheetId": sid, "dimension": "ROWS", "startIndex": 1,
+                                                     "endIndex": max(n_linhas, 2)},
+                                           "properties": {"pixelSize": 26}, "fields": "pixelSize"}},
+            {"updateDimensionProperties": {"range": {"sheetId": sid, "dimension": "COLUMNS",
+                                                     "startIndex": PRIMEIRA_OCULTA, "endIndex": ncol},
+                                           "properties": {"hiddenByUser": True}, "fields": "hiddenByUser"}},
+            {"setBasicFilter": {"filter": {"range": faixa(0, ncol, 0)}}},
+            {"setDataValidation": {"range": faixa(col("Status"), None, 1), "rule": {
+                "condition": {"type": "ONE_OF_LIST", "values": [{"userEnteredValue": s} for s in STATUS_VALIDOS]},
+                "showCustomUi": True, "strict": False}}},
+        ]
+        for nome, px in larguras.items():
+            i = col(nome)
+            req.append({"updateDimensionProperties": {
+                "range": {"sheetId": sid, "dimension": "COLUMNS", "startIndex": i, "endIndex": i + 1},
+                "properties": {"pixelSize": px}, "fields": "pixelSize"}})
+
+        req += [
+            regra("=$A2<55", {"textFormat": {"foregroundColor": cor("#8a8a8a")}}),
+            regra("=AND($A2>=55,$A2<75)", {"backgroundColor": cor("#fff4cc")}),
+            regra("=$A2>=75", {"backgroundColor": cor("#d6f0d9")}),
+            regra('=$B2="candidatura enviada"', {"backgroundColor": cor("#d6e6fb")}),
+            regra('=$B2="entrevista"', {"backgroundColor": cor("#e6d9f7"), "textFormat": {"bold": True}}),
+            regra('=OR($B2="encerrada",$B2="descartada")',
+                  {"backgroundColor": cor("#eeeeee"),
+                   "textFormat": {"strikethrough": True, "foregroundColor": cor("#9e9e9e")}}),
+        ]
+        self.planilha.batch_update({"requests": req})
 
 
 def abrir_registro():
