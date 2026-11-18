@@ -1,24 +1,16 @@
-"""Registro de vagas: Google Sheets (produção) ou CSV local (teste).
-
-Regras de atualização (o histórico nunca é apagado):
-- Vaga nova           -> entra com Status = "nova" e Data da descoberta = hoje.
-- Vaga já registrada  -> atualiza dados e "Última vez vista"; NÃO mexe em
-                         Status nem em Minhas notas (colunas da Nu).
-- Vaga que sumiu da fonte (e a fonte foi consultada sem erro)
-                      -> Verificação = "não listada na fonte desde <data>".
-                         Se o Status era "nova"/"analisar", vira "encerrada".
-                         Status de candidaturas/entrevistas não é alterado.
-"""
+"""Registro de vagas: Google Sheets (produção) ou CSV local (teste)."""
 from __future__ import annotations
 
 import csv
 import json
+import logging
 import os
 from pathlib import Path
 
 from .models import Vaga
 
-# Ordem pensada para leitura: o que importa primeiro; colunas técnicas no fim (ocultas).
+log = logging.getLogger(__name__)
+
 COLUNAS = [
     "Nota", "Status", "Empresa", "Vaga", "Cidade", "Modalidade", "Prazo", "Link", "Alertas",
     "Carga horária", "Cursos aceitos", "Bolsa e benefícios", "Publicação", "Minhas notas",
@@ -50,11 +42,9 @@ def mesclar(existentes: list[dict], encontradas: list[Vaga], fontes_ok: set[str]
     por_id = {r["ID"]: dict(r) for r in existentes if r.get("ID")}
     novas: list[dict] = []
     mudancas: list[str] = []
-    vistos = set()
 
     for v in encontradas:
         nova_linha = vaga_para_linha(v, hoje)
-        vistos.add(v.id)
         if v.id in por_id:
             antiga = por_id[v.id]
             if antiga.get("Prazo") != nova_linha["Prazo"]:
@@ -139,10 +129,18 @@ class RegistroSheets:
         from gspread.utils import rowcol_to_a1
         self.aba.batch_clear([f"A1:{rowcol_to_a1(self.aba.row_count, max(len(COLUNAS), self.aba.col_count))}"])
         self.aba.update(valores, "A1", value_input_option="RAW")
-        if self.precisa_formatar:
-            self._formatar(len(valores))
+        try:
+            meta = self._meta()
+            if self.precisa_formatar or not meta.get("conditionalFormats"):
+                self._formatar(len(valores), meta)
+        except Exception as e:  # noqa: BLE001
+            log.warning("formatação da planilha falhou (dados foram salvos): %s", e)
 
-    def _formatar(self, n_linhas: int):
+    def _meta(self) -> dict:
+        meta = self.planilha.fetch_sheet_metadata()
+        return next(x for x in meta["sheets"] if x["properties"]["sheetId"] == self.aba.id)
+
+    def _formatar(self, n_linhas: int, aba_meta: dict):
         sid = self.aba.id
         ncol = len(COLUNAS)
         col = COLUNAS.index
@@ -167,8 +165,6 @@ class RegistroSheets:
                 "booleanRule": {"condition": {"type": "CUSTOM_FORMULA", "values": [{"userEnteredValue": formula}]},
                                 "format": fmt}}}}
 
-        meta = self.planilha.fetch_sheet_metadata()
-        aba_meta = next(x for x in meta["sheets"] if x["properties"]["sheetId"] == sid)
         req = [{"deleteConditionalFormatRule": {"sheetId": sid, "index": 0}}
                for _ in aba_meta.get("conditionalFormats", [])]
         if aba_meta.get("basicFilter"):
@@ -222,7 +218,14 @@ class RegistroSheets:
                   {"backgroundColor": cor("#eeeeee"),
                    "textFormat": {"strikethrough": True, "foregroundColor": cor("#9e9e9e")}}),
         ]
-        self.planilha.batch_update({"requests": req})
+        falhas = 0
+        for r in req:
+            try:
+                self.planilha.batch_update({"requests": [r]})
+            except Exception as e:  # noqa: BLE001
+                falhas += 1
+                log.warning("formatação recusada (%s): %s", next(iter(r)), str(e)[:300])
+        log.info("formatação aplicada: %d comandos ok, %d recusados", len(req) - falhas, falhas)
 
 
 def abrir_registro():
