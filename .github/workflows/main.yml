@@ -2,9 +2,13 @@ name: Busca diária de vagas
 
 on:
   schedule:
-    # 11:17 UTC = 08:17 em Brasília, segunda a sexta
     - cron: "17 11 * * 1-5"
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: vagas
@@ -13,7 +17,7 @@ concurrency:
 jobs:
   buscar:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: bot-vagas
@@ -36,3 +40,17 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      - name: Preparar site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: bot-vagas/_site
+
+  publicar-site:
+    needs: buscar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
