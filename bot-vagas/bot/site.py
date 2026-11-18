@@ -13,25 +13,26 @@ from .text import contains_any, norm
 
 
 def _iso(s) -> str:
-    s = str(s or "")
-    if len(s) == 10 and s[2] == "/" and s[5] == "/":
-        return f"{s[6:10]}-{s[3:5]}-{s[0:2]}"
-    return s[:10]
+    from .registro import br_para_iso
+    return br_para_iso(s)[:10]
 
 
 def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora: datetime,
            paginas: list[dict] | None = None) -> dict:
     vagas = []
     for r in linhas:
+        # público: só vagas abertas; candidaturas e descartes ficam só na planilha/banco do app
         if str(r.get("Verificação", "")).startswith("não listada"):
             continue
+        if r.get("Status") in ("encerrada", "descartada"):
+            continue
         vagas.append({
-            "id": r.get("ID", ""), "nota": int(r.get("Nota") or 0), "status": r.get("Status", ""),
+            "id": r.get("ID", ""), "nota": int(r.get("Nota") or 0), "status": "",
             "tipo": r.get("Tipo", "Estágio"), "empresa": r.get("Empresa", ""), "vaga": r.get("Vaga", ""),
             "cidade": str(r.get("Cidade", "")).split(",")[0], "modalidade": r.get("Modalidade", ""),
             "carga": r.get("Carga horária", ""), "cursos": r.get("Cursos aceitos", ""),
-            "bolsa": r.get("Bolsa e benefícios", ""), "prazo": str(r.get("Prazo", "")),
-            "publicacao": str(r.get("Publicação", "")), "alertas": r.get("Alertas", ""),
+            "bolsa": r.get("Bolsa e benefícios", ""), "prazo": _iso(r.get("Prazo")) or str(r.get("Prazo", "")),
+            "publicacao": _iso(r.get("Publicação")) or str(r.get("Publicação", "")), "alertas": r.get("Alertas", ""),
             "link": r.get("URL") or r.get("Link") or "", "verificacao": r.get("Verificação", ""),
             "nova": r.get("ID") in novas_ids,
             # primeira vez que o robô viu a vaga (AAAA-MM-DD): permite "novas desde a sua última visita"

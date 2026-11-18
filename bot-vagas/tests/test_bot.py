@@ -296,3 +296,20 @@ def test_exclusoes_fora_do_perfil():
     assert analise.eh_alvo(v("Analista de Fluxo de Caixa Jr"), CFG)
     assert analise.eh_alvo(v("Analista Plan Estoque JR"), CFG)
     assert analise.eh_alvo(gupy._to_vaga(job(2, "Estágio em Liderança e Processos")), CFG)
+
+
+def test_datas_numericas_e_json_publico(tmp_path):
+    import json
+    from datetime import datetime
+    from bot.registro import br_para_iso
+    from bot.site import gerar_site
+    assert br_para_iso(46343) == "2026-11-17" and br_para_iso("46343") == "2026-11-17"
+    assert br_para_iso("20/11/2026") == "2026-11-20" and br_para_iso("não divulgado") == "não divulgado"
+    L = [{"ID": "a", "Nota": 80, "Status": "candidatura enviada", "Vaga": "x", "Data da descoberta": 46343,
+          "Prazo": 46346, "Verificação": "aberta"},
+         {"ID": "b", "Nota": 70, "Status": "descartada", "Vaga": "y", "Verificação": "aberta"}]
+    gerar_site(L, [], [], datetime(2026, 11, 18), str(tmp_path / "index.html"))
+    d = json.loads((tmp_path / "vagas.json").read_text(encoding="utf-8"))
+    assert [v["id"] for v in d["vagas"]] == ["a"]
+    v = d["vagas"][0]
+    assert v["status"] == "" and v["descoberta"] == "2026-11-17" and v["prazo"] == "2026-11-20"

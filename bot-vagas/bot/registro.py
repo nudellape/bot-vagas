@@ -42,7 +42,13 @@ def iso_para_br(s) -> str:
 
 
 def br_para_iso(s) -> str:
-    s = str(s or "")
+    """'20/11/2026' -> '2026-11-20'; número de série do Sheets (46343) -> '2026-11-17'."""
+    from datetime import date, timedelta
+    if isinstance(s, (int, float)) and not isinstance(s, bool) and 30000 < s < 80000:
+        return (date(1899, 12, 30) + timedelta(days=int(s))).isoformat()
+    s = str(s or "").strip()
+    if s.isdigit() and len(s) == 5 and 30000 < int(s) < 80000:
+        return (date(1899, 12, 30) + timedelta(days=int(s))).isoformat()
     if len(s) == 10 and s[2] == "/" and s[5] == "/":
         return f"{s[6:10]}-{s[3:5]}-{s[0:2]}"
     return s
