@@ -12,11 +12,9 @@ perfil:
   limiar_alerta: 55
 
 localizacao:
-  # Barão Geraldo é distrito de Campinas: vagas lá aparecem como "Campinas".
+  # Nu mora em Barão Geraldo (distrito de Campinas) e vai de moto 125cc: só Campinas e região próxima.
   prioridade_1: [Campinas, Paulínia, Sumaré]
-  prioridade_2: [Hortolândia, Jaguariúna, Valinhos, Vinhedo, Indaiatuba,
-                 Americana, Nova Odessa, Cosmópolis, Holambra, Itatiba,
-                 Santa Bárbara d'Oeste, Pedreira, Monte Mor]
+  prioridade_2: [Hortolândia, Jaguariúna, Valinhos, Vinhedo]
 
 busca:
   # Janela máxima de publicação (dias). Vagas até 7 dias são marcadas "recente".
@@ -51,21 +49,29 @@ busca:
   pausa_entre_requisicoes_seg: 1.0
 
 # ---------------------------------------------------------------------
-# Páginas de carreira em Workday (opcional).
-# Muitas multinacionais (agro, química, energia) usam Workday.
-# Como achar os valores: abra a página de vagas da empresa no navegador.
-# Se o endereço for  https://EMPRESA.wd3.myworkdayjobs.com/pt-BR/SITE
-#   host   = EMPRESA.wd3.myworkdayjobs.com
-#   tenant = EMPRESA
-#   site   = SITE
-# Confira no navegador antes de adicionar; não há como o bot adivinhar.
+# Empresas com página de carreira própria (além da Gupy)
 # ---------------------------------------------------------------------
-workday: []
-#  - empresa: "Nome da Empresa"
-#    host: "empresa.wd3.myworkdayjobs.com"
-#    tenant: "empresa"
-#    site: "Careers"
-#    termos: ["estágio", "intern"]
+# SmartRecruiters: o "id" é o trecho depois de careers.smartrecruiters.com/
+smartrecruiters: []
+#  - empresa: "Nome"
+#    id: "IdDaEmpresa"       # careers.smartrecruiters.com/IdDaEmpresa
+#    pais: "br"
+#    termos: ["estágio", "estagiário", "intern"]
+
+# Workday: endereço https://HOST/pt-BR/SITE  -> host, tenant (início do host), site.
+# Os dois abaixo estão "a confirmar": o bot testa a cada execução; se o endereço
+# estiver errado, só aparece um aviso no log (sem alerta no Telegram).
+workday:
+  - empresa: "3M"
+    host: "3m.wd1.myworkdayjobs.com"
+    tenant: "3m"
+    site: "Search"
+    termos: ["estágio", "estagiário", "intern"]
+  - empresa: "GE Vernova"
+    host: "gevernova.wd5.myworkdayjobs.com"
+    tenant: "gevernova"
+    site: "Vernova_ExternalSite"
+    termos: ["estágio", "estagiário", "intern"]
 
 # ---------------------------------------------------------------------
 # Pontuação (rubrica do prompt: 30/25/20/15/10)

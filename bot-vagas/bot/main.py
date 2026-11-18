@@ -20,7 +20,7 @@ import yaml
 
 from . import alertas, analise, registro
 from .models import Vaga
-from .sources import gupy, workday
+from .sources import gupy, smartrecruiters, workday
 from .text import norm
 
 log = logging.getLogger("bot")
@@ -64,14 +64,20 @@ def coletar_tudo(cfg: dict, session: requests.Session | None = None):
     erros += e_gupy
     if not e_gupy:  # só considera a Gupy "completa" se nenhuma consulta falhou
         fontes_ok.add("gupy:")
-    v_wd, e_wd, ok_wd = workday.coletar(cfg, s)
-    erros += e_wd
-    fontes_ok |= ok_wd
-    return v_gupy + v_wd, erros, fontes_ok
+    extras, extras_ids = [], set()
+    for fonte in (workday, smartrecruiters):
+        v, avisos, ok, ids = fonte.coletar(cfg, s)
+        extras += v
+        extras_ids |= ids
+        fontes_ok |= ok
+        for a in avisos:  # empresas extras: falha vai só para o log, sem alerta
+            log.warning("aviso: %s", a)
+    coletar_tudo.ids_extras = extras_ids
+    return v_gupy + extras, erros, fontes_ok
 
 
 def processar(brutas: list[Vaga], cfg: dict, hoje) -> tuple[list[Vaga], set[str]]:
-    ids_abertos = {v.id for v in brutas}
+    ids_abertos = {v.id for v in brutas} | getattr(coletar_tudo, "ids_extras", set())
     vagas = [v for v in deduplicar(brutas)
              if analise.eh_estagio(v) and na_regiao_ou_remota(v, cfg) and analise.dentro_da_janela(v, cfg, hoje)]
     for v in vagas:
@@ -117,6 +123,12 @@ def main(argv: list[str] | None = None) -> int:
     reg = registro.abrir_registro()
     linhas, novas, mudancas = registro.mesclar(reg.ler(), vagas, fontes_ok, hoje.isoformat(), ids_abertos)
     reg.gravar(linhas)
+    try:
+        from .painel import atualizar_painel
+        if hasattr(reg, "planilha"):
+            atualizar_painel(reg.planilha, linhas, novas, agora)
+    except Exception as e:  # noqa: BLE001
+        log.warning("painel não atualizado: %s", e)
     log.info("registro: total=%d novas=%d mudancas=%d (%s)", len(linhas), len(novas), len(mudancas),
              type(reg).__name__)
 

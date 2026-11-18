@@ -36,6 +36,8 @@ class FakeSession:
         self.chamadas += 1
         if self.falhar:
             raise ConnectionError("simulado")
+        if "gupy" not in url:
+            return FakeResp({"content": [], "totalFound": 0, "data": []})
         if params.get("offset", 0) == 0 and params.get("city") == "Campinas" and params["jobName"] == "estágio":
             return FakeResp({"data": self.jobs, "pagination": {"total": len(self.jobs)}})
         return FakeResp({"data": [], "pagination": {"total": 0}})
@@ -107,7 +109,7 @@ def test_fluxo_completo_csv(tmp_path, monkeypatch):
         job(14, "Estágio em Operações", city="Paulínia", wt="on-site", desc="30 horas semanais."),
     ]
     brutas, erros, ok = main.coletar_tudo(CFG, FakeSession(jobs))
-    assert erros == [] and ok == {"gupy:"}
+    assert erros == [] and "gupy:" in ok
     vagas, ids = main.processar(brutas, CFG, HOJE)
     assert sorted(v.id for v in vagas) == ["gupy:10", "gupy:14"]
 

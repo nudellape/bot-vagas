@@ -4,6 +4,12 @@ Usa o endpoint interno que alimenta o próprio portal (não documentado; pode mu
     GET https://portal.gupy.io/api/job-search/jobs?jobName=...&limit=..&offset=..
 O endereço antigo (portal.api.gupy.io / employability-portal.gupy.io) passou a
 responder 404 em out/2026; fica como reserva caso volte.
+Não requer login. O portal lista apenas vagas com inscrições abertas, então
+"aparecer na busca" é a evidência de que a vaga está aberta naquele momento.
+
+O filtro `workplaceType` NÃO é enviado (a API responde 404 com ele); vagas
+remotas são separadas localmente. Se uma consulta falhar, o bot tenta de novo
+sem acento e, por último, sem o filtro de cidade (o filtro local cuida disso).
 """
 from __future__ import annotations
 
@@ -22,8 +28,8 @@ ENDPOINTS = [
     "https://employability-portal.gupy.io/api/v1/jobs",
     "https://portal.api.gupy.io/api/v1/jobs",
 ]
-_endpoint_ok: str | None = None
-PAGE = 10
+_endpoint_ok: str | None = None  # memoriza o endereço que funcionou nesta execução
+PAGE = 10  # tamanho de página aceito pelo portal
 HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                    "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"),
@@ -79,6 +85,8 @@ def _paginar(url: str, job_name: str, city: str | None, max_paginas: int, pausa:
 
 def buscar(job_name: str, *, city: str | None = None, max_paginas: int = 15, pausa: float = 1.0,
            session: requests.Session | None = None) -> list[Vaga]:
+    """Tenta: (termo, cidade) -> (termo sem acento, cidade) -> (termo sem acento, sem cidade).
+    Lança a última exceção se todas falharem."""
     s = session or requests.Session()
     sem_acento = norm(job_name)
     tentativas = [(job_name, city)]
@@ -104,6 +112,7 @@ def buscar(job_name: str, *, city: str | None = None, max_paginas: int = 15, pau
 
 
 def coletar(cfg: dict, session: requests.Session | None = None) -> tuple[list[Vaga], list[str]]:
+    """Executa todas as consultas configuradas. Retorna (vagas, erros)."""
     b = cfg["busca"]
     loc = cfg["localizacao"]
     pausa = b.get("pausa_entre_requisicoes_seg", 1.0)

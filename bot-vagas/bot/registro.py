@@ -1,4 +1,14 @@
-"""Registro de vagas: Google Sheets (produção) ou CSV local (teste)."""
+"""Registro de vagas: Google Sheets (produção) ou CSV local (teste).
+
+Regras de atualização (o histórico nunca é apagado):
+- Vaga nova           -> entra com Status = "nova" e Data da descoberta = hoje.
+- Vaga já registrada  -> atualiza dados e "Última vez vista"; NÃO mexe em
+                         Status nem em Minhas notas (colunas da Nu).
+- Vaga que sumiu da fonte (e a fonte foi consultada sem erro)
+                      -> Verificação = "não listada na fonte desde <data>".
+                         Se o Status era "nova"/"analisar", vira "encerrada".
+                         Status de candidaturas/entrevistas não é alterado.
+"""
 from __future__ import annotations
 
 import csv
@@ -11,14 +21,40 @@ from .models import Vaga
 
 log = logging.getLogger(__name__)
 
+# Ordem pensada para leitura: o que importa primeiro; colunas técnicas no fim (ocultas).
 COLUNAS = [
     "Nota", "Status", "Empresa", "Vaga", "Cidade", "Modalidade", "Prazo", "Link", "Alertas",
     "Carga horária", "Cursos aceitos", "Bolsa e benefícios", "Publicação", "Minhas notas",
-    "Detalhe da nota", "Verificação", "Data da descoberta", "Última vez vista", "Fonte", "ID",
+    "Detalhe da nota", "Verificação", "Data da descoberta", "Última vez vista", "Fonte", "ID", "URL",
 ]
+COLUNAS_DATA = ["Prazo", "Publicação", "Data da descoberta", "Última vez vista"]
 PRIMEIRA_OCULTA = COLUNAS.index("Detalhe da nota")
 STATUS_VALIDOS = ["nova", "analisar", "candidatura enviada", "entrevista", "encerrada", "descartada"]
 COLUNAS_DA_NU = {"Status", "Minhas notas"}
+
+
+def iso_para_br(s) -> str:
+    """'2026-11-20' -> '20/11/2026'; outros textos ficam como estão."""
+    s = str(s or "")
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        return f"{s[8:10]}/{s[5:7]}/{s[0:4]}"
+    return s
+
+
+def br_para_iso(s) -> str:
+    s = str(s or "")
+    if len(s) == 10 and s[2] == "/" and s[5] == "/":
+        return f"{s[6:10]}-{s[3:5]}-{s[0:2]}"
+    return s
+
+
+def _serial(iso: str):
+    """Data ISO -> número de série do Sheets (para virar data de verdade, ordenável)."""
+    from datetime import date
+    try:
+        return (date.fromisoformat(iso) - date(1899, 12, 30)).days
+    except ValueError:
+        return iso
 
 
 def vaga_para_linha(v: Vaga, hoje: str) -> dict:
@@ -30,7 +66,7 @@ def vaga_para_linha(v: Vaga, hoje: str) -> dict:
         "Bolsa e benefícios": v.bolsa_beneficios,
         "Publicação": v.publicada_em or "não verificável", "Prazo": v.prazo or "não divulgado",
         "Nota": v.nota, "Detalhe da nota": v.detalhe_nota, "Alertas": " ".join(v.alertas),
-        "Link": v.link,
+        "Link": v.link, "URL": v.link,
         "Verificação": f"aberta: listada na fonte em {hoje}",
         "Última vez vista": hoje,
     }
@@ -38,13 +74,21 @@ def vaga_para_linha(v: Vaga, hoje: str) -> dict:
 
 def mesclar(existentes: list[dict], encontradas: list[Vaga], fontes_ok: set[str], hoje: str,
             ids_abertos: set[str] | None = None):
+    """Retorna (linhas_finais, novas, mudancas).
+    encontradas = vagas filtradas para registrar/atualizar.
+    ids_abertos = TODOS os IDs devolvidos pelas fontes (inclusive fora dos filtros),
+                  usados para decidir se uma vaga registrada continua aberta.
+    fontes_ok   = prefixos de ID cuja consulta foi completa (ex.: {'gupy:'});
+                  só eles podem marcar vagas como sumidas."""
     ids_abertos = set(ids_abertos or ()) | {v.id for v in encontradas}
     por_id = {r["ID"]: dict(r) for r in existentes if r.get("ID")}
     novas: list[dict] = []
     mudancas: list[str] = []
+    vistos = set()
 
     for v in encontradas:
         nova_linha = vaga_para_linha(v, hoje)
+        vistos.add(v.id)
         if v.id in por_id:
             antiga = por_id[v.id]
             if antiga.get("Prazo") != nova_linha["Prazo"]:
@@ -77,6 +121,8 @@ def mesclar(existentes: list[dict], encontradas: list[Vaga], fontes_ok: set[str]
     return linhas, novas, mudancas
 
 
+# ------------------------------------------------------------- back-ends
+
 class RegistroCSV:
     def __init__(self, caminho: str = "dados/vagas.csv"):
         self.caminho = Path(caminho)
@@ -96,10 +142,15 @@ class RegistroCSV:
 
 
 class RegistroSheets:
+    """Planilha Google. Usa conta de serviço (JSON na variável GOOGLE_SERVICE_ACCOUNT_JSON)
+    e o ID da planilha em SHEET_ID. A aba 'Vagas' é criada se não existir.
+    A formatação (cores, larguras, filtro, colunas ocultas) é aplicada quando a aba é
+    criada ou quando o cabeçalho muda. Para reaplicar, apague a linha 1 da aba."""
+
     ABA = "Vagas"
 
     def __init__(self, sheet_id: str, credenciais_json: str):
-        import gspread
+        import gspread  # import tardio: só exige a lib quando usar Sheets
         from google.oauth2.service_account import Credentials
 
         creds = Credentials.from_service_account_info(
@@ -118,10 +169,26 @@ class RegistroSheets:
             self.precisa_formatar = True
         if not cab:
             return []
-        return self.aba.get_all_records(default_blank="")
+        # lê pelo nome das colunas, qualquer que seja a ordem (migra versões antigas)
+        linhas = self.aba.get_all_records(default_blank="")
+        for r in linhas:
+            for c in COLUNAS_DATA:
+                if c in r:
+                    r[c] = br_para_iso(r[c])
+            if not r.get("URL") and str(r.get("Link", "")).startswith("http"):
+                r["URL"] = r["Link"]  # migração da versão antiga
+            r["Link"] = r.get("URL", "")
+        return linhas
 
     def gravar(self, linhas: list[dict]) -> None:
-        valores = [COLUNAS] + [[r.get(c, "") for c in COLUNAS] for r in linhas]
+        def celula(r, c):
+            v = r.get(c, "")
+            if c in COLUNAS_DATA:
+                return _serial(br_para_iso(v))
+            if c == "Link":
+                return "Abrir vaga ↗" if r.get("URL") else ""
+            return v
+        valores = [COLUNAS] + [[celula(r, c) for c in COLUNAS] for r in linhas]
         if self.aba.row_count < len(valores):
             self.aba.add_rows(len(valores) - self.aba.row_count + 100)
         if self.aba.col_count < len(COLUNAS):
@@ -129,12 +196,35 @@ class RegistroSheets:
         from gspread.utils import rowcol_to_a1
         self.aba.batch_clear([f"A1:{rowcol_to_a1(self.aba.row_count, max(len(COLUNAS), self.aba.col_count))}"])
         self.aba.update(valores, "A1", value_input_option="RAW")
+        # formatação é "bônus": se falhar, os dados já estão salvos e o bot segue
         try:
             meta = self._meta()
             if self.precisa_formatar or not meta.get("conditionalFormats"):
                 self._formatar(len(valores), meta)
         except Exception as e:  # noqa: BLE001
             log.warning("formatação da planilha falhou (dados foram salvos): %s", e)
+
+    def _links_e_datas(self, linhas: list[dict]) -> None:
+        """Transforma 'Abrir vaga ↗' em link clicável e mostra datas como dd/mm/aaaa."""
+        sid = self.aba.id
+        ci = COLUNAS.index("Link")
+        linhas_link = [{"values": [{
+            "userEnteredValue": {"stringValue": "Abrir vaga ↗" if r.get("URL") else ""},
+            "userEnteredFormat": {"textFormat": ({"link": {"uri": r["URL"]}, "underline": True,
+                                                  "foregroundColor": {"red": 0.05, "green": 0.4, "blue": 0.8}}
+                                                 if r.get("URL") else {})}}]} for r in linhas]
+        req = []
+        if linhas_link:
+            req.append({"updateCells": {"rows": linhas_link, "fields": "userEnteredValue,userEnteredFormat.textFormat",
+                                        "start": {"sheetId": sid, "rowIndex": 1, "columnIndex": ci}}})
+        for c in COLUNAS_DATA:
+            i = COLUNAS.index(c)
+            req.append({"repeatCell": {
+                "range": {"sheetId": sid, "startRowIndex": 1, "startColumnIndex": i, "endColumnIndex": i + 1},
+                "cell": {"userEnteredFormat": {"numberFormat": {"type": "DATE", "pattern": "dd/mm/yyyy"},
+                                               "horizontalAlignment": "CENTER"}},
+                "fields": "userEnteredFormat(numberFormat,horizontalAlignment)"}})
+        self.planilha.batch_update({"requests": req})
 
     def _meta(self) -> dict:
         meta = self.planilha.fetch_sheet_metadata()
@@ -145,7 +235,7 @@ class RegistroSheets:
         ncol = len(COLUNAS)
         col = COLUNAS.index
         larguras = {"Nota": 55, "Status": 150, "Empresa": 170, "Vaga": 330, "Cidade": 110,
-                    "Modalidade": 95, "Prazo": 90, "Link": 90, "Alertas": 260, "Carga horária": 100,
+                    "Modalidade": 95, "Prazo": 95, "Link": 100, "Alertas": 260, "Carga horária": 100,
                     "Cursos aceitos": 200, "Bolsa e benefícios": 220, "Publicação": 90, "Minhas notas": 220}
 
         def faixa(c0, c1=None, r0=0, r1=None):
@@ -165,6 +255,7 @@ class RegistroSheets:
                 "booleanRule": {"condition": {"type": "CUSTOM_FORMULA", "values": [{"userEnteredValue": formula}]},
                                 "format": fmt}}}}
 
+        # remove regras e filtros antigos para não acumular
         req = [{"deleteConditionalFormatRule": {"sheetId": sid, "index": 0}}
                for _ in aba_meta.get("conditionalFormats", [])]
         if aba_meta.get("basicFilter"):
@@ -174,17 +265,21 @@ class RegistroSheets:
             {"updateSheetProperties": {"properties": {"sheetId": sid, "gridProperties": {
                 "frozenRowCount": 1, "frozenColumnCount": 4}},
                 "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount"}},
+            # tudo: texto cortado (sem quebrar), alinhado ao meio
             {"repeatCell": {"range": faixa(0, ncol, 1), "cell": {"userEnteredFormat": {
                 "wrapStrategy": "CLIP", "verticalAlignment": "MIDDLE", "textFormat": {"fontSize": 10}}},
                 "fields": "userEnteredFormat(wrapStrategy,verticalAlignment,textFormat)"}},
+            # cabeçalho escuro
             {"repeatCell": {"range": faixa(0, ncol, 0, 1), "cell": {"userEnteredFormat": {
                 "backgroundColor": cor("#1f3b4d"), "horizontalAlignment": "CENTER", "verticalAlignment": "MIDDLE",
                 "wrapStrategy": "WRAP",
                 "textFormat": {"bold": True, "foregroundColor": cor("#ffffff"), "fontSize": 10}}},
                 "fields": "userEnteredFormat"}},
+            # Nota: grande, negrito, centralizada
             {"repeatCell": {"range": faixa(col("Nota"), None, 1), "cell": {"userEnteredFormat": {
                 "horizontalAlignment": "CENTER", "textFormat": {"bold": True, "fontSize": 12}}},
                 "fields": "userEnteredFormat(horizontalAlignment,textFormat)"}},
+            # Alertas em vermelho escuro
             {"repeatCell": {"range": faixa(col("Alertas"), None, 1), "cell": {"userEnteredFormat": {
                 "textFormat": {"foregroundColor": cor("#a61b1b"), "fontSize": 9}}},
                 "fields": "userEnteredFormat.textFormat"}},
@@ -194,6 +289,7 @@ class RegistroSheets:
             {"updateDimensionProperties": {"range": {"sheetId": sid, "dimension": "ROWS", "startIndex": 1,
                                                      "endIndex": max(n_linhas, 2)},
                                            "properties": {"pixelSize": 26}, "fields": "pixelSize"}},
+            # colunas técnicas ocultas (Dados > reexibir, ou clique nas setinhas do cabeçalho)
             {"updateDimensionProperties": {"range": {"sheetId": sid, "dimension": "COLUMNS",
                                                      "startIndex": PRIMEIRA_OCULTA, "endIndex": ncol},
                                            "properties": {"hiddenByUser": True}, "fields": "hiddenByUser"}},
@@ -208,6 +304,7 @@ class RegistroSheets:
                 "range": {"sheetId": sid, "dimension": "COLUMNS", "startIndex": i, "endIndex": i + 1},
                 "properties": {"pixelSize": px}, "fields": "pixelSize"}})
 
+        # cores das linhas (a regra adicionada por último fica no topo e vence)
         req += [
             regra("=$A2<55", {"textFormat": {"foregroundColor": cor("#8a8a8a")}}),
             regra("=AND($A2>=55,$A2<75)", {"backgroundColor": cor("#fff4cc")}),
@@ -218,6 +315,7 @@ class RegistroSheets:
                   {"backgroundColor": cor("#eeeeee"),
                    "textFormat": {"strikethrough": True, "foregroundColor": cor("#9e9e9e")}}),
         ]
+        # envia um comando por vez: o que funcionar fica aplicado; o que falhar vai para o log
         falhas = 0
         for r in req:
             try:

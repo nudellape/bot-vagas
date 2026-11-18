@@ -10,6 +10,8 @@ from email.mime.text import MIMEText
 
 import requests
 
+from .registro import iso_para_br
+
 log = logging.getLogger(__name__)
 
 
@@ -17,7 +19,7 @@ def montar_texto(novas: list[dict], mudancas: list[str], erros: list[str], limia
     relevantes = [r for r in novas if int(r["Nota"]) >= limiar]
     if not relevantes and not mudancas and not erros:
         return None
-    linhas = [f"<b>Vagas de estágio · {hoje}</b>"]
+    linhas = [f"<b>◆ Radar de estágios · {hoje}</b>"]
     if relevantes:
         linhas.append(f"\n<b>{len(relevantes)} nova(s) com nota ≥ {limiar}</b>")
         for r in sorted(relevantes, key=lambda x: -int(x["Nota"]))[:15]:
@@ -25,7 +27,7 @@ def montar_texto(novas: list[dict], mudancas: list[str], erros: list[str], limia
             linhas.append(
                 f"\n<b>{e(r['Nota'])}</b> · {e(r['Empresa'])}: <a href=\"{e(r['Link'])}\">{e(r['Vaga'])}</a>\n"
                 f"{e(r['Cidade'])} · {e(r['Modalidade'])} · {e(r['Carga horária'])}\n"
-                f"Publicação: {e(r['Publicação'])} · Prazo: {e(r['Prazo'])}"
+                f"Publicação: {e(iso_para_br(r['Publicação']))} · Prazo: {e(iso_para_br(r['Prazo']))}"
                 + (f"\n⚠ {e(r['Alertas'])}" if r.get("Alertas") else ""))
     abaixo = len(novas) - len(relevantes)
     if abaixo:

@@ -2,10 +2,10 @@
 
 Roda sozinho de segunda a sexta às 8h17 (Brasília) no GitHub Actions, de graça:
 
-1. **Coleta** vagas abertas na Gupy (todas as de estágio nas cidades das prioridades 1 e 2, mais buscas nacionais só de vagas remotas) e, opcionalmente, nas páginas Workday das empresas que você cadastrar.
+1. **Coleta** vagas abertas na Gupy (todas as de estágio nas cidades das prioridades 1 e 2, mais vagas remotas), e em páginas Workday (3M e GE Vernova, endereços a confirmar).
 2. **Filtra**: só estágio, só região ou remoto, publicadas nos últimos 30 dias (vagas sem data publicada são mantidas). Remove duplicatas.
 3. **Dá nota de 0 a 100** pela sua rubrica (30 atividades, 25 curso, 20 local, 15 jornada, 10 aprendizado). O que a vaga não informa vira **DESCONHECIDO** com nota intermediária e aparece escrito na coluna "Detalhe da nota".
-4. **Registra** tudo na aba `Vagas` de uma planilha Google, sem apagar histórico.
+4. **Registra** tudo na aba `Vagas` de uma planilha Google (datas dd/mm/aaaa, link "Abrir vaga" clicável, cores por nota), sem apagar histórico, e atualiza a aba `Painel` (resumo em tema escuro: indicadores, top 10 e prazos da semana).
 5. **Avisa** por Telegram e/ou e-mail só o que é **novo** com nota ≥ 55, mais mudanças (prazo alterado, vaga que saiu do ar).
 
 ## O que o bot faz e o que não faz
