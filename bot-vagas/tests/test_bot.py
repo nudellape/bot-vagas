@@ -313,3 +313,25 @@ def test_datas_numericas_e_json_publico(tmp_path):
     assert [v["id"] for v in d["vagas"]] == ["a"]
     v = d["vagas"][0]
     assert v["status"] == "" and v["descoberta"] == "2026-11-17" and v["prazo"] == "2026-11-20"
+
+
+def test_dados_neutros_no_json(tmp_path):
+    import json
+    from datetime import datetime
+    from bot.site import gerar_site
+    v = gupy._to_vaga(job(77, "Assistente de Planejamento e Qualidade", tipo="vacancy_type_effective", desc=(
+        "Cursando Engenharia de Produção ou Mecânica. Formatura entre 2027 e 2028. 40 horas semanais. "
+        "Indicadores em Power BI, apoio à qualidade e melhoria contínua. Ensino superior completo desejável.")))
+    analise.pontuar(v, CFG, HOJE)
+    assert v.horas_semana == 40 and v.curso_categoria == "amplo" and v.formatura_exigida == "2027-2028"
+    assert {"Dados e BI", "Qualidade", "Planejamento e projetos", "Processos e melhoria contínua"} <= set(v.areas)
+    assert all("2028" not in a or "Pede formatura" in a for a in v.alertas_gerais)   # nada do perfil da Nu
+    assert not any("dez/2028" in a for a in v.alertas_gerais)
+    linha = registro.vaga_para_linha(v, "2026-11-17")
+    linha["Status"] = "nova"
+    gerar_site([linha], [], [], datetime(2026, 11, 18), str(tmp_path / "index.html"))
+    d = json.loads((tmp_path / "vagas.json").read_text(encoding="utf-8"))["vagas"][0]
+    assert d["horas_semana"] == 40 and d["curso_categoria"] == "amplo" and d["formatura_exigida"] == "2027-2028"
+    assert "Qualidade" in d["areas"] and d["trecho"].startswith("Cursando Engenharia")
+    assert any("CLT" in a for a in d["alertas_gerais"]) and d["pts_aprendizado"] >= 4
+    assert d["nota"] == v.nota

@@ -90,6 +90,35 @@ def extrair_ano_formatura(desc_n: str) -> tuple[int, int] | None:
     return min(a, b), max(a, b)
 
 
+# Taxonomia neutra de áreas (para nota pessoal de qualquer usuário)
+AREAS_AMIGAVEIS = {
+    "Dados e BI": ["dados", "analytics", "bi", "power bi", "business intelligence", "data analyst", "data science",
+                   "ciencia de dados", "dashboard", "indicadores", "kpi"],
+    "Processos e melhoria contínua": ["processo", "melhoria continua", "lean", "excelencia operacional", "kaizen",
+                                      "six sigma"],
+    "Planejamento e projetos": ["planejamento", "pmo", "projeto", "controle de projetos", "pcp", "project"],
+    "Operações": ["operacoes", "operations", "operacional", "producao"],
+    "Agro": ["agricola", "agronegocio", "agro", "agricultura", "agronomia", "agricultura de precisao", "campo"],
+    "Sustentabilidade e meio ambiente": ["sustentabilidade", "meio ambiente", "ambiental", "esg", "sustainability"],
+    "Saúde e segurança (EHS)": ["ehs", "sso", "saude e seguranca", "seguranca do trabalho", "hse"],
+    "Supply chain e logística": ["supply", "supply chain", "logistica", "compras", "suprimentos", "procurement",
+                                 "estoque"],
+    "Qualidade": ["qualidade", "quality"],
+    "Finanças e controladoria": ["financeiro", "financas", "controladoria", "custos", "contabil", "fiscal",
+                                 "tesouraria", "faturamento"],
+    "P&D e pesquisa": ["p&d", "pesquisa", "research", "desenvolvimento de produto", "laboratorio"],
+    "Engenharia, automação e manutenção": ["automacao", "manutencao", "eletrica", "mecanica", "engenharia",
+                                           "projetos mecanicos"],
+    "TI e software": ["ti", "software", "desenvolvedor", "desenvolvimento de sistemas", "programacao", "sistemas"],
+    "Administrativo e RH": ["administrativo", "administracao", "rh", "recursos humanos", "departamento pessoal"],
+}
+
+
+def areas_da_vaga(titulo_n: str, desc_n: str) -> list[str]:
+    texto = f"{titulo_n} {titulo_n} {desc_n[:4000]}"
+    return [nome for nome, termos in AREAS_AMIGAVEIS.items() if contains_any(texto, termos)]
+
+
 # ------------------------------------------------------------------ nota
 
 def _cidade_norm(c: str) -> str:
@@ -131,17 +160,23 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
 
     # --- 2. Curso (25)
     v.cursos_aceitos, cat = extrair_cursos(desc_n)
+    v.curso_categoria = cat
+    gerais: list[str] = []
     p_curso = {"explicito": 25, "amplo": 22, "aberto": 19, "lista": 4, "desconhecido": 13}[cat]
     nota_curso = {"desconhecido": "DESCONHECIDO: curso não especificado, nota intermediária"}.get(cat, v.cursos_aceitos)
     if cat == "lista":
         alertas.append("Curso: lista publicada não inclui Eng. Agrícola/Engenharias. Confirmar antes de aplicar.")
+        gerais.append("A lista de cursos publicada não inclui engenharias: confira se o seu curso é aceito.")
     if re.search(r"(?<![a-z])(ensino medio|nivel tecnico|curso tecnico|estagio tecnico)(?![a-z])", titulo_n + " " + desc_n[:600]):
         p_curso = min(p_curso, 3)
         alertas.append("Possível vaga de nível técnico/médio, não superior.")
+        gerais.append("Possível vaga de nível técnico/médio, não superior.")
     forma = extrair_ano_formatura(desc_n)
     ano_nu = int(cfg["perfil"]["formatura"][:4])
     if forma:
         amin, amax = forma
+        v.formatura_exigida = f"{amin}-{amax}"
+        gerais.append(f"Pede formatura entre {amin} e {amax}." if amin != amax else f"Pede formatura em {amin}.")
         if ano_nu > amax:
             p_curso = max(0, p_curso - 12)
             alertas.append(f"Exige formatura até {amax}; a previsão da Nu é {cfg['perfil']['formatura']}.")
@@ -176,6 +211,7 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
 
     # --- 4. Jornada (15)
     v.carga_horaria, horas = extrair_carga(desc_n)
+    v.horas_semana = horas
     if horas is None:
         p_jor, m_jor = 8, "DESCONHECIDA: jornada não publicada, nota intermediária"
     elif horas <= 30:
@@ -185,6 +221,7 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
     else:
         p_jor, m_jor = 3, f"{v.carga_horaria} (acima de 30h)"
         alertas.append(f"Jornada {v.carga_horaria}: acima das 30h semanais preferidas.")
+        gerais.append(f"Jornada de {v.carga_horaria}.")
     detalhes.append(f"Jornada {p_jor}/15 ({m_jor})")
 
     # --- 5. Aprendizado (10)
@@ -192,6 +229,7 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
                                     "capacitacao", "desenvolvimento profissional", "job rotation",
                                     "efetivacao", "projeto de estagio", "aprendizado", "rotacao"])
     p_apr = min(10, 4 + 2 * len(sinais)) if sinais else 4
+    v.pts_aprendizado = p_apr
     detalhes.append(f"Aprendizado {p_apr}/10 ({', '.join(sinais[:4]) if sinais else 'sem sinais explícitos'})")
 
     v.nota = p_ativ + p_curso + p_loc + p_jor + p_apr
@@ -203,6 +241,7 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
         try:
             if datetime.strptime(v.prazo, "%Y-%m-%d").date() < hoje:
                 alertas.append(f"Prazo de inscrição ({v.prazo}) já passou.")
+                gerais.append("O prazo de inscrição informado já passou.")
         except ValueError:
             pass
     if v.publicada_em:
@@ -213,8 +252,12 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
             pass
     if tipo_vaga(v) in ("Emprego", "Trainee"):
         alertas.append("Emprego/CLT: confirmar compatibilidade com o horário das aulas (formatura dez/2028).")
+        gerais.append("Emprego CLT: confira se o horário é compatível com as aulas.")
         if re.search(r"superior completo|graduacao completa|formad[oa]s?\b|ensino superior concluido", desc_n):
             alertas.append("Pode exigir graduação completa.")
+            gerais.append("Pode exigir graduação completa.")
+    v.areas = areas_da_vaga(titulo_n, desc_n)
+    v.alertas_gerais = gerais
     v.alertas = alertas
     return v
 

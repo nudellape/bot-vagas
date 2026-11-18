@@ -15,6 +15,7 @@ import csv
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 from .models import Vaga
@@ -26,6 +27,8 @@ COLUNAS = [
     "Nota", "Status", "Tipo", "Empresa", "Vaga", "Cidade", "Modalidade", "Prazo", "Link da vaga", "Alertas",
     "Carga horária", "Cursos aceitos", "Bolsa e benefícios", "Publicação", "Minhas notas",
     "Detalhe da nota", "Verificação", "Data da descoberta", "Última vez vista", "Fonte", "ID", "URL",
+    # dados neutros (ocultos), usados pelo app para a nota pessoal de cada usuário
+    "Horas semana", "Curso categoria", "Formatura exigida", "Áreas", "Trecho", "Alertas gerais", "Pts aprendizado",
 ]
 COLUNAS_DATA = ["Prazo", "Publicação", "Data da descoberta", "Última vez vista"]
 PRIMEIRA_OCULTA = COLUNAS.index("Detalhe da nota")
@@ -78,6 +81,10 @@ def vaga_para_linha(v: Vaga, hoje: str) -> dict:
         "Publicação": v.publicada_em or "não verificável", "Prazo": v.prazo or "não divulgado",
         "Nota": v.nota, "Detalhe da nota": v.detalhe_nota, "Alertas": " ".join(v.alertas),
         "Link": v.link, "Link da vaga": v.link, "URL": v.link,
+        "Horas semana": v.horas_semana if v.horas_semana is not None else "",
+        "Curso categoria": v.curso_categoria, "Formatura exigida": v.formatura_exigida,
+        "Áreas": "; ".join(v.areas), "Trecho": re.sub(r"\s+", " ", v.descricao or "")[:600],
+        "Alertas gerais": " | ".join(v.alertas_gerais), "Pts aprendizado": v.pts_aprendizado,
         "Verificação": v.verificacao or f"aberta: listada na fonte em {iso_para_br(hoje)}",
         "Última vez vista": hoje,
     }

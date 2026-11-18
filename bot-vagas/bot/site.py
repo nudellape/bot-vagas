@@ -12,6 +12,13 @@ from pathlib import Path
 from .text import contains_any, norm
 
 
+def _int(s):
+    try:
+        return int(float(s))
+    except (TypeError, ValueError):
+        return None
+
+
 def _iso(s) -> str:
     from .registro import br_para_iso
     return br_para_iso(s)[:10]
@@ -37,6 +44,14 @@ def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora:
             "nova": r.get("ID") in novas_ids,
             # primeira vez que o robô viu a vaga (AAAA-MM-DD): permite "novas desde a sua última visita"
             "descoberta": _iso(r.get("Data da descoberta")),
+            # ---- dados neutros: para o app calcular a nota de cada usuário pelo perfil dele
+            "horas_semana": _int(r.get("Horas semana")),
+            "curso_categoria": r.get("Curso categoria", "") or "desconhecido",
+            "formatura_exigida": str(r.get("Formatura exigida", "") or ""),
+            "areas": [a for a in str(r.get("Áreas", "") or "").split("; ") if a],
+            "trecho": str(r.get("Trecho", "") or ""),
+            "alertas_gerais": [a for a in str(r.get("Alertas gerais", "") or "").split(" | ") if a],
+            "pts_aprendizado": _int(r.get("Pts aprendizado")) or 4,
         })
     emp = []
     for e in empresas:
