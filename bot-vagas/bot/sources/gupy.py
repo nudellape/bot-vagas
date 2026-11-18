@@ -121,7 +121,10 @@ def coletar(cfg: dict, session: requests.Session | None = None) -> tuple[list[Va
     out: list[Vaga] = []
     erros: list[str] = []
 
-    consultas = ([(t, c) for c in loc["prioridade_1"] + loc["prioridade_2"] for t in b["gupy_termos_por_cidade"]]
+    termos_cidade = list(b["gupy_termos_por_cidade"])
+    if b.get("incluir_empregos"):
+        termos_cidade += b.get("gupy_termos_emprego_por_cidade", [])
+    consultas = ([(t, c) for c in loc["prioridade_1"] + loc["prioridade_2"] for t in termos_cidade]
                  + [(t, None) for t in b["gupy_termos_remotos"]])
     for termo, cidade in consultas:
         try:

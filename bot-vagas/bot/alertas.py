@@ -25,7 +25,7 @@ def montar_texto(novas: list[dict], mudancas: list[str], erros: list[str], limia
         for r in sorted(relevantes, key=lambda x: -int(x["Nota"]))[:15]:
             e = lambda s: html.escape(str(s))  # noqa: E731
             linhas.append(
-                f"\n<b>{e(r['Nota'])}</b> · {e(r['Empresa'])}: <a href=\"{e(r['Link'])}\">{e(r['Vaga'])}</a>\n"
+                f"\n<b>{e(r['Nota'])}</b> · [{e(r.get('Tipo', 'Estágio'))}] {e(r['Empresa'])}: <a href=\"{e(r['Link'])}\">{e(r['Vaga'])}</a>\n"
                 f"{e(r['Cidade'])} · {e(r['Modalidade'])} · {e(r['Carga horária'])}\n"
                 f"Publicação: {e(iso_para_br(r['Publicação']))} · Prazo: {e(iso_para_br(r['Prazo']))}"
                 + (f"\n⚠ {e(r['Alertas'])}" if r.get("Alertas") else ""))

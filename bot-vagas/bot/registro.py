@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 
 # Ordem pensada para leitura: o que importa primeiro; colunas técnicas no fim (ocultas).
 COLUNAS = [
-    "Nota", "Status", "Empresa", "Vaga", "Cidade", "Modalidade", "Prazo", "Link", "Alertas",
+    "Nota", "Status", "Tipo", "Empresa", "Vaga", "Cidade", "Modalidade", "Prazo", "Link da vaga", "Alertas",
     "Carga horária", "Cursos aceitos", "Bolsa e benefícios", "Publicação", "Minhas notas",
     "Detalhe da nota", "Verificação", "Data da descoberta", "Última vez vista", "Fonte", "ID", "URL",
 ]
@@ -57,17 +57,22 @@ def _serial(iso: str):
         return iso
 
 
+def _tipo(v: Vaga) -> str:
+    from .analise import tipo_vaga
+    return tipo_vaga(v)
+
+
 def vaga_para_linha(v: Vaga, hoje: str) -> dict:
     return {
-        "ID": v.id, "Fonte": v.fonte, "Empresa": v.empresa, "Vaga": v.titulo,
+        "ID": v.id, "Fonte": v.fonte, "Tipo": _tipo(v), "Empresa": v.empresa, "Vaga": v.titulo,
         "Cidade": v.cidade or ("remoto" if v.modalidade == "remoto" else "não informada"),
         "Modalidade": v.modalidade or "não informada",
         "Carga horária": v.carga_horaria, "Cursos aceitos": v.cursos_aceitos,
         "Bolsa e benefícios": v.bolsa_beneficios,
         "Publicação": v.publicada_em or "não verificável", "Prazo": v.prazo or "não divulgado",
         "Nota": v.nota, "Detalhe da nota": v.detalhe_nota, "Alertas": " ".join(v.alertas),
-        "Link": v.link, "URL": v.link,
-        "Verificação": f"aberta: listada na fonte em {hoje}",
+        "Link": v.link, "Link da vaga": v.link, "URL": v.link,
+        "Verificação": v.verificacao or f"aberta: listada na fonte em {iso_para_br(hoje)}",
         "Última vez vista": hoje,
     }
 
@@ -175,8 +180,9 @@ class RegistroSheets:
             for c in COLUNAS_DATA:
                 if c in r:
                     r[c] = br_para_iso(r[c])
-            if not r.get("URL") and str(r.get("Link", "")).startswith("http"):
-                r["URL"] = r["Link"]  # migração da versão antiga
+            for antigo in ("Link da vaga", "Link"):
+                if not r.get("URL") and str(r.get(antigo, "")).startswith("http"):
+                    r["URL"] = r[antigo]  # migração de versões antigas
             r["Link"] = r.get("URL", "")
         return linhas
 
@@ -184,9 +190,9 @@ class RegistroSheets:
         def celula(r, c):
             v = r.get(c, "")
             if c in COLUNAS_DATA:
-                return _serial(br_para_iso(v))
-            if c == "Link":
-                return "Abrir vaga ↗" if r.get("URL") else ""
+                return iso_para_br(br_para_iso(v))   # texto dd/mm/aaaa (sempre aparece certo)
+            if c == "Link da vaga":
+                return r.get("URL") or r.get("Link") or v             # endereço da vaga: o Sheets deixa clicável
             return v
         valores = [COLUNAS] + [[celula(r, c) for c in COLUNAS] for r in linhas]
         if self.aba.row_count < len(valores):
@@ -204,28 +210,6 @@ class RegistroSheets:
         except Exception as e:  # noqa: BLE001
             log.warning("formatação da planilha falhou (dados foram salvos): %s", e)
 
-    def _links_e_datas(self, linhas: list[dict]) -> None:
-        """Transforma 'Abrir vaga ↗' em link clicável e mostra datas como dd/mm/aaaa."""
-        sid = self.aba.id
-        ci = COLUNAS.index("Link")
-        linhas_link = [{"values": [{
-            "userEnteredValue": {"stringValue": "Abrir vaga ↗" if r.get("URL") else ""},
-            "userEnteredFormat": {"textFormat": ({"link": {"uri": r["URL"]}, "underline": True,
-                                                  "foregroundColor": {"red": 0.05, "green": 0.4, "blue": 0.8}}
-                                                 if r.get("URL") else {})}}]} for r in linhas]
-        req = []
-        if linhas_link:
-            req.append({"updateCells": {"rows": linhas_link, "fields": "userEnteredValue,userEnteredFormat.textFormat",
-                                        "start": {"sheetId": sid, "rowIndex": 1, "columnIndex": ci}}})
-        for c in COLUNAS_DATA:
-            i = COLUNAS.index(c)
-            req.append({"repeatCell": {
-                "range": {"sheetId": sid, "startRowIndex": 1, "startColumnIndex": i, "endColumnIndex": i + 1},
-                "cell": {"userEnteredFormat": {"numberFormat": {"type": "DATE", "pattern": "dd/mm/yyyy"},
-                                               "horizontalAlignment": "CENTER"}},
-                "fields": "userEnteredFormat(numberFormat,horizontalAlignment)"}})
-        self.planilha.batch_update({"requests": req})
-
     def _meta(self) -> dict:
         meta = self.planilha.fetch_sheet_metadata()
         return next(x for x in meta["sheets"] if x["properties"]["sheetId"] == self.aba.id)
@@ -234,8 +218,8 @@ class RegistroSheets:
         sid = self.aba.id
         ncol = len(COLUNAS)
         col = COLUNAS.index
-        larguras = {"Nota": 55, "Status": 150, "Empresa": 170, "Vaga": 330, "Cidade": 110,
-                    "Modalidade": 95, "Prazo": 95, "Link": 100, "Alertas": 260, "Carga horária": 100,
+        larguras = {"Nota": 55, "Status": 150, "Tipo": 80, "Empresa": 170, "Vaga": 330, "Cidade": 110,
+                    "Modalidade": 95, "Prazo": 95, "Link da vaga": 160, "Alertas": 260, "Carga horária": 100,
                     "Cursos aceitos": 200, "Bolsa e benefícios": 220, "Publicação": 90, "Minhas notas": 220}
 
         def faixa(c0, c1=None, r0=0, r1=None):
@@ -263,12 +247,13 @@ class RegistroSheets:
 
         req += [
             {"updateSheetProperties": {"properties": {"sheetId": sid, "gridProperties": {
-                "frozenRowCount": 1, "frozenColumnCount": 4}},
+                "frozenRowCount": 1, "frozenColumnCount": 5}},
                 "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount"}},
             # tudo: texto cortado (sem quebrar), alinhado ao meio
             {"repeatCell": {"range": faixa(0, ncol, 1), "cell": {"userEnteredFormat": {
                 "wrapStrategy": "CLIP", "verticalAlignment": "MIDDLE", "textFormat": {"fontSize": 10}}},
-                "fields": "userEnteredFormat(wrapStrategy,verticalAlignment,textFormat)"}},
+                "fields": "userEnteredFormat.wrapStrategy,userEnteredFormat.verticalAlignment,"
+                          "userEnteredFormat.textFormat.fontSize"}},
             # cabeçalho escuro
             {"repeatCell": {"range": faixa(0, ncol, 0, 1), "cell": {"userEnteredFormat": {
                 "backgroundColor": cor("#1f3b4d"), "horizontalAlignment": "CENTER", "verticalAlignment": "MIDDLE",
@@ -278,11 +263,12 @@ class RegistroSheets:
             # Nota: grande, negrito, centralizada
             {"repeatCell": {"range": faixa(col("Nota"), None, 1), "cell": {"userEnteredFormat": {
                 "horizontalAlignment": "CENTER", "textFormat": {"bold": True, "fontSize": 12}}},
-                "fields": "userEnteredFormat(horizontalAlignment,textFormat)"}},
+                "fields": "userEnteredFormat.horizontalAlignment,userEnteredFormat.textFormat.bold,"
+                          "userEnteredFormat.textFormat.fontSize"}},
             # Alertas em vermelho escuro
             {"repeatCell": {"range": faixa(col("Alertas"), None, 1), "cell": {"userEnteredFormat": {
                 "textFormat": {"foregroundColor": cor("#a61b1b"), "fontSize": 9}}},
-                "fields": "userEnteredFormat.textFormat"}},
+                "fields": "userEnteredFormat.textFormat.foregroundColor,userEnteredFormat.textFormat.fontSize"}},
             {"updateDimensionProperties": {"range": {"sheetId": sid, "dimension": "ROWS", "startIndex": 0,
                                                      "endIndex": 1},
                                            "properties": {"pixelSize": 36}, "fields": "pixelSize"}},

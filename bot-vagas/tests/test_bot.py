@@ -161,3 +161,79 @@ def test_texto_do_alerta():
     t = alertas.montar_texto([r], ["X: prazo mudou"], [], 55, "17/11/2026")
     assert "&lt;PMO&gt;" in t and "Mudanças" in t
     assert alertas.montar_texto([], [], [], 55, "17/11/2026") is None
+
+
+# ------------------------------------------------------ Agrobase e FAPESP
+
+RSS = b"""<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+ xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel>
+<item><title>Est\xc3\xa1gio em agricultura de precis\xc3\xa3o \xe2\x80\x93 Jaguari\xc3\xbana/SP</title>
+<link>https://www.agrobase.com.br/estagios/?p=40001</link><guid>https://www.agrobase.com.br/estagios/?p=40001</guid>
+<pubDate>Mon, 16 Nov 2026 10:00:00 +0000</pubDate>
+<content:encoded><![CDATA[<p>Empresa: Fazenda Modelo</p><p>Cursando Engenharia Agr\xc3\xadcola. 6 horas por dia.</p>]]></content:encoded></item>
+<item><title>Est\xc3\xa1gio em vendas \xe2\x80\x93 Cuiab\xc3\xa1/MT</title><link>https://x/?p=2</link>
+<pubDate>Mon, 16 Nov 2026 10:00:00 +0000</pubDate></item>
+<item><title>Est\xc3\xa1gio antigo \xe2\x80\x93 Campinas/SP</title><link>https://x/?p=3</link>
+<pubDate>Mon, 01 Sep 2026 10:00:00 +0000</pubDate></item>
+</channel></rss>"""
+
+
+def test_agrobase_le_feed_filtra_cidade_e_data():
+    from bot.sources import agrobase
+    alvo = {"campinas", "jaguariuna", "paulinia"}
+    vagas = agrobase.ler_feed(RSS, False, alvo, HOJE, 21)
+    assert [v.cidade for v in vagas] == ["Jaguariúna"]
+    v = vagas[0]
+    assert v.id == "agrobase:40001" and v.empresa == "Fazenda Modelo"
+    assert v.titulo == "Estágio em agricultura de precisão" and v.verificacao.startswith("NÃO CONFIRMADA")
+    analise.pontuar(v, CFG, HOJE)
+    assert "Engenharia Agrícola citada" == v.cursos_aceitos and v.carga_horaria == "6h/dia"
+
+
+LISTA = """<div><a href="/iniciacao-cientifica-em-agricultura-digital-na-unicamp/59001">Iniciação científica em
+agricultura digital na Unicamp</a><a href="/pos-doutorado-em-fisica-na-usp/59002">Pós-doutorado em física na USP</a>
+<a href="https://agencia.fapesp.br/treinamento-tecnico-na-unicamp-de-limeira/59003">Treinamento técnico na Unicamp de Limeira</a></div>"""
+NOTICIA = """<html><body><h1>Iniciação científica em agricultura digital na Unicamp</h1><p>10 de novembro de 2026</p>
+<p>Uma vaga de iniciação científica está disponível na Feagri-Unicamp. As inscrições vão até 30/11.</p>
+<p>Mais informações em: www.fapesp.br/oportunidades/9901/.</p></body></html>"""
+
+
+def test_fapesp_listagem_e_noticia(monkeypatch):
+    from bot.sources import fapesp
+    monkeypatch.setattr(fapesp.time, "sleep", lambda *_: None)
+
+    class R:
+        def __init__(s, t): s.text = t; s.status_code = 200
+        def raise_for_status(s): pass
+
+    class S:
+        def get(s, url, **k):
+            return R(LISTA if "/oportunidades" in url else NOTICIA)
+
+    vagas, avisos, ok, ids = fapesp.coletar({**CFG, "fapesp": {"paginas": 1}}, S())
+    assert len(vagas) == 1 and ok == set()
+    v = vagas[0]
+    assert v.cidade == "Campinas" and v.prazo == "2026-11-30" and v.publicada_em == "2026-11-10"
+    assert v.link == "https://www.fapesp.br/oportunidades/9901/" and v.id == "fapesp:9901"
+    assert analise.eh_estagio(v)
+
+
+def test_empregos_de_entrada_e_exclusoes():
+    ok = gupy._to_vaga(job(50, "Assistente Administrativo Financeiro", tipo="vacancy_type_effective",
+                           desc="Ensino superior completo. 44 horas semanais."))
+    senior = gupy._to_vaga(job(51, "Analista de Dados Sênior", tipo="vacancy_type_effective"))
+    aprendiz = gupy._to_vaga(job(52, "Jovem Aprendiz Administrativo", tipo="vacancy_type_apprentice"))
+    assert analise.eh_alvo(ok, CFG) and not analise.eh_alvo(senior, CFG) and not analise.eh_alvo(aprendiz, CFG)
+    analise.pontuar(ok, CFG, HOJE)
+    assert analise.tipo_vaga(ok) == "Emprego"
+    assert any("CLT" in a for a in ok.alertas) and any("graduação completa" in a for a in ok.alertas)
+    assert registro.vaga_para_linha(ok, "2026-11-17")["Tipo"] == "Emprego"
+
+
+def test_agrobase_ignora_bolsas_e_empresas_nao_confundem():
+    from bot import painel
+    from bot.sources import agrobase
+    rss = RSS.replace(b"Est\xc3\xa1gio em agricultura", b"Bolsa de inicia\xc3\xa7\xc3\xa3o cient\xc3\xadfica em agricultura")
+    assert agrobase.ler_feed(rss, False, {"jaguariuna"}, HOJE, 21) == []
+    linhas = [{"Empresa": "Shellfish Ltda", "Vaga": "x", "Nota": 50, "Status": "nova", "Verificação": "aberta"}]
+    assert painel._conta(linhas, ["shell"]) == (0, 0)

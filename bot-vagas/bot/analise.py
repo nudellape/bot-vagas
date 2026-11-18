@@ -211,6 +211,10 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
             v.recente = dias <= cfg["busca"].get("recente_dias", 7)
         except ValueError:
             pass
+    if tipo_vaga(v) in ("Emprego", "Trainee"):
+        alertas.append("Emprego/CLT: confirmar compatibilidade com o horário das aulas (formatura dez/2028).")
+        if re.search(r"superior completo|graduacao completa|formad[oa]s?\b|ensino superior concluido", desc_n):
+            alertas.append("Pode exigir graduação completa.")
     v.alertas = alertas
     return v
 
@@ -227,7 +231,33 @@ def dentro_da_janela(v: Vaga, cfg: dict, hoje: date | None = None) -> bool:
     return (hoje - d).days <= cfg["busca"].get("janela_dias", 30)
 
 
+def tipo_vaga(v: Vaga) -> str:
+    t = norm(v.titulo)
+    if eh_estagio(v):
+        return "Estágio"
+    if "trainee" in t:
+        return "Trainee"
+    if v.tipo == "bolsa":
+        return "Bolsa"
+    return "Emprego"
+
+
+def eh_alvo(v: Vaga, cfg: dict) -> bool:
+    """Estágio sempre; emprego só se incluir_empregos e o cargo for de entrada."""
+    b = cfg.get("busca", {})
+    t = f" {norm(v.titulo)} "
+    if any(f" {norm(x).strip()}" in t if x.startswith(" ") else norm(x) in t for x in b.get("excluir_titulos", [])):
+        return False
+    if "apprentice" in (v.tipo or "").lower():
+        return False
+    if eh_estagio(v):
+        return True
+    if v.tipo == "bolsa":
+        return False
+    return bool(b.get("incluir_empregos"))
+
+
 def eh_estagio(v: Vaga) -> bool:
     t = norm(v.titulo)
-    return ("internship" in (v.tipo or "").lower()
+    return ("internship" in (v.tipo or "").lower() or v.tipo == "bolsa"
             or bool(re.search(r"estagi|(?<![a-z])intern(ship)?s?(?![a-z])", t)))

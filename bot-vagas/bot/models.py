@@ -17,7 +17,8 @@ class Vaga:
     publicada_em: str = ""       # AAAA-MM-DD, somente se a fonte informar
     prazo: str = ""              # AAAA-MM-DD, somente se a fonte informar
     link: str = ""
-    tipo: str = ""               # tipo informado pela fonte (ex.: vacancy_type_internship)
+    tipo: str = ""               # tipo informado pela fonte (ex.: vacancy_type_internship, bolsa)
+    verificacao: str = ""        # texto próprio de verificação (fontes que não confirmam abertura)
 
     # Preenchidos pela análise
     carga_horaria: str = "não informada"

@@ -20,7 +20,7 @@ import yaml
 
 from . import alertas, analise, registro
 from .models import Vaga
-from .sources import gupy, smartrecruiters, workday
+from .sources import agrobase, fapesp, gupy, smartrecruiters, workday
 from .text import norm
 
 log = logging.getLogger("bot")
@@ -65,7 +65,7 @@ def coletar_tudo(cfg: dict, session: requests.Session | None = None):
     if not e_gupy:  # só considera a Gupy "completa" se nenhuma consulta falhou
         fontes_ok.add("gupy:")
     extras, extras_ids = [], set()
-    for fonte in (workday, smartrecruiters):
+    for fonte in (workday, smartrecruiters, agrobase, fapesp):
         v, avisos, ok, ids = fonte.coletar(cfg, s)
         extras += v
         extras_ids |= ids
@@ -79,7 +79,7 @@ def coletar_tudo(cfg: dict, session: requests.Session | None = None):
 def processar(brutas: list[Vaga], cfg: dict, hoje) -> tuple[list[Vaga], set[str]]:
     ids_abertos = {v.id for v in brutas} | getattr(coletar_tudo, "ids_extras", set())
     vagas = [v for v in deduplicar(brutas)
-             if analise.eh_estagio(v) and na_regiao_ou_remota(v, cfg) and analise.dentro_da_janela(v, cfg, hoje)]
+             if analise.eh_alvo(v, cfg) and na_regiao_ou_remota(v, cfg) and analise.dentro_da_janela(v, cfg, hoje)]
     for v in vagas:
         analise.pontuar(v, cfg, hoje)
     return sorted(vagas, key=lambda v: -v.nota), ids_abertos
@@ -129,6 +129,19 @@ def main(argv: list[str] | None = None) -> int:
             atualizar_painel(reg.planilha, linhas, novas, agora)
     except Exception as e:  # noqa: BLE001
         log.warning("painel não atualizado: %s", e)
+    try:
+        from .site import gerar_site
+        caminho = gerar_site(linhas, novas, cfg.get("empresas_alvo") or [], agora,
+                             os.getenv("SITE_PATH", "_site/index.html"))
+        log.info("site gerado em %s", caminho)
+    except Exception as e:  # noqa: BLE001
+        log.warning("site não gerado: %s", e)
+    try:
+        from .painel import atualizar_empresas
+        if hasattr(reg, "planilha"):
+            atualizar_empresas(reg.planilha, linhas, cfg.get("empresas_alvo") or [])
+    except Exception as e:  # noqa: BLE001
+        log.warning("aba Empresas não atualizada: %s", e)
     log.info("registro: total=%d novas=%d mudancas=%d (%s)", len(linhas), len(novas), len(mudancas),
              type(reg).__name__)
 

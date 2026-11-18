@@ -2,7 +2,7 @@
 
 Roda sozinho de segunda a sexta às 8h17 (Brasília) no GitHub Actions, de graça:
 
-1. **Coleta** vagas abertas na Gupy (todas as de estágio nas cidades das prioridades 1 e 2, mais vagas remotas), e em páginas Workday (3M e GE Vernova, endereços a confirmar).
+1. **Coleta** vagas abertas na Gupy (todas as de estágio nas cidades das prioridades 1 e 2, mais vagas remotas), em páginas Workday (3M e GE Vernova, endereços a confirmar), na Agrobase (estágios do agro, marcados como NÃO CONFIRMADA) e nas bolsas de iniciação científica da Agência FAPESP em instituições da região (Unicamp, CNPEM, Embrapa, Ital, IAC, CPqD).
 2. **Filtra**: só estágio, só região ou remoto, publicadas nos últimos 30 dias (vagas sem data publicada são mantidas). Remove duplicatas.
 3. **Dá nota de 0 a 100** pela sua rubrica (30 atividades, 25 curso, 20 local, 15 jornada, 10 aprendizado). O que a vaga não informa vira **DESCONHECIDO** com nota intermediária e aparece escrito na coluna "Detalhe da nota".
 4. **Registra** tudo na aba `Vagas` de uma planilha Google (datas dd/mm/aaaa, link "Abrir vaga" clicável, cores por nota), sem apagar histórico, e atualiza a aba `Painel` (resumo em tema escuro: indicadores, top 10 e prazos da semana).
