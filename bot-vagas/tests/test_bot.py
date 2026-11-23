@@ -358,3 +358,11 @@ def test_emprego_fora_da_area_nao_e_alvo_mas_estagio_sim():
     estagio = Vaga(id="t:3", fonte="t", titulo="Estágio em Loja", empresa="X", cidade="Campinas")
     assert not analise.eh_alvo(churras, CFG)
     assert analise.eh_alvo(estagio, CFG)
+
+
+def test_detalhe_da_nota_vai_para_o_json():
+    from bot.site import _detalhe
+    d = _detalhe("Atividades 22/30 (título: dados (muito alta)) | Curso 13/25 (DESCONHECIDO: curso não especificado) | Local 20/20 (Campinas)")
+    assert d[0] == {"criterio": "Atividades", "pontos": 22, "max": 30, "motivo": "título: dados (muito alta)"}
+    assert [x["criterio"] for x in d] == ["Atividades", "Curso", "Local"]
+    assert _detalhe("") == []

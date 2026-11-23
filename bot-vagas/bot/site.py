@@ -6,6 +6,7 @@ Não inclui a coluna "Minhas notas" (o site é acessível por link).
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -52,6 +53,8 @@ def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora:
             "trecho": str(r.get("Trecho", "") or ""),
             "alertas_gerais": [a for a in str(r.get("Alertas gerais", "") or "").split(" | ") if a],
             "pts_aprendizado": _int(r.get("Pts aprendizado")) or 4,
+            # pontos por critério, para o app mostrar "Por que essa nota?"
+            "detalhe": _detalhe(r.get("Detalhe da nota", "")),
         })
     emp = []
     for e in empresas:
@@ -62,6 +65,20 @@ def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora:
                     "busca": e.get("busca", e["nome"]), "n": n})
     return {"atualizado": agora.strftime("%d/%m/%Y às %H:%M"), "hoje": agora.strftime("%Y-%m-%d"),
             "vagas": vagas, "empresas": emp, "paginas": paginas or []}
+
+
+_CRITERIO = re.compile(r"^\s*([A-Za-zÀ-ú]+) (\d+)/(\d+) \((.*)\)\s*$")
+
+
+def _detalhe(texto) -> list[dict]:
+    """'Atividades 22/30 (título: dados) | Curso 25/25 (...)' -> [{criterio, pontos, max, motivo}]."""
+    itens = []
+    for parte in str(texto or "").split(" | "):
+        m = _CRITERIO.match(parte)
+        if m:
+            itens.append({"criterio": m.group(1), "pontos": int(m.group(2)), "max": int(m.group(3)),
+                          "motivo": m.group(4)})
+    return itens
 
 
 def gerar_site(linhas: list[dict], novas: list[dict], empresas: list[dict], agora: datetime,
