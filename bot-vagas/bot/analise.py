@@ -125,11 +125,22 @@ def _cidade_norm(c: str) -> str:
     return norm(c.split(",")[0].split("-")[0])
 
 
+# Phrases that contain area words but say nothing about the work ("Processo Seletivo 2027").
+_FRASES_VAZIAS = re.compile(r"(?<![a-z])(processos? seletivos?|programa de estagio|projeto de estagio|programa de trainee)(?![a-z])")
+
+
+def sem_frases_vazias(texto_norm: str) -> str:
+    return _FRASES_VAZIAS.sub(" ", texto_norm)
+
+
 def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
     hoje = hoje or date.today()
     areas = cfg["areas"]
     titulo_n = norm(v.titulo)
     desc_n = norm(v.descricao)
+    # area matching ignores "processo seletivo" & co., otherwise any program title scores 30/30
+    titulo_area = sem_frases_vazias(titulo_n)
+    desc_area = sem_frases_vazias(desc_n)
     detalhes: list[str] = []
     alertas: list[str] = []
 
@@ -137,13 +148,13 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
     tiers = [("muito_alta", 30, 18), ("alta", 25, 14), ("media", 19, 10)]
     p_ativ, motivo = 8, "nenhuma área-alvo identificada"
     for nome, no_titulo, so_desc in tiers:
-        hits_t = contains_any(titulo_n, areas[nome])
+        hits_t = contains_any(titulo_area, areas[nome])
         if hits_t:
             p_ativ, motivo = no_titulo, f"título: {', '.join(hits_t[:3])} ({nome.replace('_', ' ')})"
             break
     if p_ativ == 8:
         for nome, no_titulo, so_desc in tiers:
-            hits_d = contains_any(desc_n, areas[nome])
+            hits_d = contains_any(desc_area, areas[nome])
             if len(hits_d) >= 2:
                 p_ativ, motivo = so_desc, f"descrição: {', '.join(hits_d[:3])} ({nome.replace('_', ' ')})"
                 break
@@ -294,8 +305,23 @@ def titulo_excluido(titulo: str, cfg: dict) -> bool:
     return bool(contains_any(t, termos))
 
 
+def emprego_na_area(titulo: str, cfg: dict) -> bool:
+    """A job (not internship) only counts if its title names one of Nu's areas.
+
+    The Gupy search for "assistente" returns every kind of assistant (barbecue, shop, kitchen...);
+    a blocklist never ends, so jobs need a positive match instead.
+    """
+    t = sem_frases_vazias(norm(titulo))
+    if contains_any(t, ["trainee"]):
+        return True
+    a = cfg.get("areas", {})
+    termos = [*a.get("muito_alta", []), *a.get("alta", []), *a.get("media", []),
+              *cfg.get("busca", {}).get("emprego_titulo_tambem_aceita", [])]
+    return bool(contains_any(t, termos))
+
+
 def eh_alvo(v: Vaga, cfg: dict) -> bool:
-    """Estágio sempre; emprego só se incluir_empregos e o cargo for de entrada."""
+    """Estágio sempre; emprego só se incluir_empregos, cargo de entrada e título da área."""
     b = cfg.get("busca", {})
     if titulo_excluido(v.titulo, cfg):
         return False
@@ -305,7 +331,7 @@ def eh_alvo(v: Vaga, cfg: dict) -> bool:
         return True
     if v.tipo == "bolsa":
         return False
-    return bool(b.get("incluir_empregos"))
+    return bool(b.get("incluir_empregos")) and emprego_na_area(v.titulo, cfg)
 
 
 def eh_estagio(v: Vaga) -> bool:

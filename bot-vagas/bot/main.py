@@ -124,7 +124,8 @@ def main(argv: list[str] | None = None) -> int:
     linhas, novas, mudancas = registro.mesclar(reg.ler(), vagas, fontes_ok, hoje.isoformat(), ids_abertos)
     # vagas já registradas que agora caem nas exclusões: descarta (somem do site/app)
     for r in linhas:
-        if r.get("Status") in ("nova", "analisar") and analise.titulo_excluido(str(r.get("Vaga", "")), cfg):
+        fora_da_area = r.get("Tipo") == "Emprego" and not analise.emprego_na_area(str(r.get("Vaga", "")), cfg)
+        if r.get("Status") in ("nova", "analisar") and (analise.titulo_excluido(str(r.get("Vaga", "")), cfg) or fora_da_area):
             r["Status"] = "descartada"
             r["Minhas notas"] = (str(r.get("Minhas notas") or "") + " [descartada automaticamente: fora do perfil]").strip()
     reg.gravar(linhas)

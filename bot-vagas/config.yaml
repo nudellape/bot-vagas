@@ -29,6 +29,14 @@ busca:
   incluir_empregos: true
   gupy_termos_emprego_por_cidade: ["assistente", "auxiliar administrativo", "analista júnior",
                                    "analista jr", "trainee"]
+  # Emprego (não estágio) só entra se o título tiver uma palavra das áreas abaixo (areas:) ou desta lista.
+  # Assim "assistente de churrasqueiro" ou "assistente de loja" nunca aparecem.
+  emprego_titulo_tambem_aceita: [administrativo, administrativa, engenharia, engenheiro, engenheira,
+                                 pcp, suprimentos, contábil, contabil, fiscal, laboratório, laboratorio,
+                                 "segurança do trabalho", analytics, "analista de dados", sistemas,
+                                 agronômico, agronomico, ambiental, florestal, geoprocessamento,
+                                 "fluxo de caixa", tesouraria, faturamento, "contas a pagar", "contas a receber",
+                                 estoque, inventário, inventario, "planejamento de demanda", "plan"]
   # Títulos com estes termos são descartados (cargo acima do nível de entrada ou fora do alvo)
   excluir_titulos: [pleno, sênior, senior, " sr ", " sr.", especialista, coordenador, coordenadora,
                     gerente, supervisor, supervisora, líder, lider, diretor, diretora, head,

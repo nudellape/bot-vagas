@@ -335,3 +335,26 @@ def test_dados_neutros_no_json(tmp_path):
     assert "Qualidade" in d["areas"] and d["trecho"].startswith("Cursando Engenharia")
     assert any("CLT" in a for a in d["alertas_gerais"]) and d["pts_aprendizado"] >= 4
     assert d["nota"] == v.nota
+
+
+def test_emprego_so_entra_com_area_no_titulo():
+    cfg = CFG
+    assert not analise.emprego_na_area("Assistente de Churrasqueiro", cfg)
+    assert not analise.emprego_na_area("Assistente de Loja", cfg)
+    assert analise.emprego_na_area("Assistente Administrativo", cfg)
+    assert analise.emprego_na_area("Analista Jr de Planejamento", cfg)
+    assert analise.emprego_na_area("Trainee 2027", cfg)
+    assert not analise.emprego_na_area("Processo Seletivo 2027", cfg)
+
+
+def test_processo_seletivo_nao_vale_nota_maxima():
+    v = analise.pontuar(Vaga(id="t:1", fonte="t", titulo="Estágio - Processo Seletivo 2027", empresa="X",
+                             cidade="Campinas", descricao=""), CFG, HOJE)
+    assert "Atividades 8/30" in v.detalhe_nota
+
+
+def test_emprego_fora_da_area_nao_e_alvo_mas_estagio_sim():
+    churras = Vaga(id="t:2", fonte="t", titulo="Assistente de Churrasqueiro", empresa="X", cidade="Campinas")
+    estagio = Vaga(id="t:3", fonte="t", titulo="Estágio em Loja", empresa="X", cidade="Campinas")
+    assert not analise.eh_alvo(churras, CFG)
+    assert analise.eh_alvo(estagio, CFG)
