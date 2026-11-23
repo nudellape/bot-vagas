@@ -29,6 +29,7 @@ COLUNAS = [
     "Detalhe da nota", "Verificação", "Data da descoberta", "Última vez vista", "Fonte", "ID", "URL",
     # dados neutros (ocultos), usados pelo app para a nota pessoal de cada usuário
     "Horas semana", "Curso categoria", "Formatura exigida", "Áreas", "Trecho", "Alertas gerais", "Pts aprendizado",
+    "Trecho cursos",
 ]
 COLUNAS_DATA = ["Prazo", "Publicação", "Data da descoberta", "Última vez vista"]
 PRIMEIRA_OCULTA = COLUNAS.index("Detalhe da nota")
@@ -84,6 +85,7 @@ def vaga_para_linha(v: Vaga, hoje: str) -> dict:
         "Horas semana": v.horas_semana if v.horas_semana is not None else "",
         "Curso categoria": v.curso_categoria, "Formatura exigida": v.formatura_exigida,
         "Áreas": "; ".join(v.areas), "Trecho": re.sub(r"\s+", " ", v.descricao or "")[:600],
+        "Trecho cursos": v.trecho_cursos,
         "Alertas gerais": " | ".join(v.alertas_gerais), "Pts aprendizado": v.pts_aprendizado,
         "Verificação": v.verificacao or f"aberta: listada na fonte em {iso_para_br(hoje)}",
         "Última vez vista": hoje,

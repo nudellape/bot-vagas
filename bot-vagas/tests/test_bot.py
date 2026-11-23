@@ -366,3 +366,11 @@ def test_detalhe_da_nota_vai_para_o_json():
     assert d[0] == {"criterio": "Atividades", "pontos": 22, "max": 30, "motivo": "título: dados (muito alta)"}
     assert [x["criterio"] for x in d] == ["Atividades", "Curso", "Local"]
     assert _detalhe("") == []
+
+
+def test_trecho_cursos_guarda_a_lista_inteira():
+    from bot.text import norm
+    d = norm("Requisitos: cursando Engenharia Agrícola, Mecânica, Elétrica ou Produção, com formatura em 2027. Benefícios: VR.")
+    t = analise.trecho_cursos(d)
+    assert "mecanica" in t and "producao" in t
+    assert analise.trecho_cursos(norm("Vaga legal em Campinas.")) == ""

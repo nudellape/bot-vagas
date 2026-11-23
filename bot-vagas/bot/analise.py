@@ -78,6 +78,27 @@ def extrair_cursos(desc_n: str) -> tuple[str, str]:
     return "não especificado", "desconhecido"
 
 
+_CURSO_GATILHO = re.compile(r"(?<![a-z])(cursando|graduacao|graduando|formacao|estudantes? de|bacharelado|"
+                            r"tecnologo|cursos?|engenharias?|eng\.)(?![a-z])")
+
+
+def trecho_cursos(desc_n: str, limite: int = 400) -> str:
+    """Pieces of the description that talk about accepted courses (for matching anyone's course).
+
+    The sheet's 'Cursos aceitos' says only "Engenharia Agrícola citada" when Nu's course appears,
+    which hides the rest of the list; this keeps the original wording around each mention.
+    """
+    pedacos, fim_anterior = [], -1
+    for m in _CURSO_GATILHO.finditer(desc_n):
+        ini, fim = max(0, m.start() - 20, fim_anterior), min(len(desc_n), m.end() + 160)
+        if ini < fim:
+            pedacos.append(desc_n[ini:fim].strip())
+            fim_anterior = fim
+        if sum(len(p) for p in pedacos) >= limite:
+            break
+    return " … ".join(pedacos)[:limite]
+
+
 def extrair_ano_formatura(desc_n: str) -> tuple[int, int] | None:
     """Procura exigência do tipo 'formatura até dez/2027' ou 'conclusão entre 2026 e 2027'.
     Retorna (ano_min, ano_max) ou None."""
@@ -172,6 +193,7 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
     # --- 2. Curso (25)
     v.cursos_aceitos, cat = extrair_cursos(desc_n)
     v.curso_categoria = cat
+    v.trecho_cursos = trecho_cursos(desc_n)
     gerais: list[str] = []
     p_curso = {"explicito": 25, "amplo": 22, "aberto": 19, "lista": 4, "desconhecido": 13}[cat]
     nota_curso = {"desconhecido": "DESCONHECIDO: curso não especificado, nota intermediária"}.get(cat, v.cursos_aceitos)

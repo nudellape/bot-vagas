@@ -35,3 +35,4 @@ class Vaga:
     areas: list[str] = field(default_factory=list)
     alertas_gerais: list[str] = field(default_factory=list)
     pts_aprendizado: int = 0
+    trecho_cursos: str = ""      # trechos da descrição que falam de cursos aceitos
