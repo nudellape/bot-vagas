@@ -347,6 +347,8 @@ def eh_alvo(v: Vaga, cfg: dict) -> bool:
     b = cfg.get("busca", {})
     if titulo_excluido(v.titulo, cfg):
         return False
+    if contains_any(norm(f"{v.empresa} {v.titulo}"), b.get("excluir_empresas", [])):
+        return False
     if "apprentice" in (v.tipo or "").lower():
         return False
     if eh_estagio(v):

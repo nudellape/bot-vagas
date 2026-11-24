@@ -55,11 +55,30 @@ def vagas_das_linhas(linhas: list[dict], hoje: date, dias: int = 30) -> list[Vag
     return out
 
 
+ARQUIVO = os.path.join(os.path.dirname(__file__), "..", "..", "dados", "alertas_email.json")
+
+
+def _do_arquivo(hoje: date, dias: int) -> list[Vaga]:
+    """Rows saved in the repo (e.g. read from Gmail by hand before the script is installed)."""
+    try:
+        with open(ARQUIVO, encoding="utf-8") as f:
+            return vagas_das_linhas(json.load(f), hoje, dias)
+    except (OSError, ValueError):
+        return []
+
+
 def coletar(cfg: dict, session=None):
     """Returns (vagas, avisos, fontes_ok, ids). Never marks anything as closed: e-mail can't confirm that."""
     c = cfg.get("alertas_email") or {}
     if not c.get("ativo", True):
         return [], [], set(), set()
+    # the saved file only counts in production (tests and local runs stay deterministic)
+    do_arquivo = _do_arquivo(date.today(), int(c.get("dias", 30))) if os.getenv("SHEET_ID") else []
+    v, avisos, ok, ids = _coletar_planilha(c)
+    return do_arquivo + v, avisos, ok, ids | {x.id for x in do_arquivo}
+
+
+def _coletar_planilha(c: dict):
     sid, cred = os.getenv("SHEET_ID"), os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not (sid and cred):
         return [], [], set(), set()  # local run without the sheet

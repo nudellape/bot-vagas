@@ -393,3 +393,10 @@ def test_alertas_email_viram_vagas_e_passam_pelos_filtros():
     assert vs[0].fonte == "Glassdoor (e-mail)" and "não confirmada" in vs[0].verificacao
     assert na_regiao_ou_remota(vs[0], CFG) and not na_regiao_ou_remota(vs[1], CFG)
     assert analise.eh_alvo(vs[0], CFG)
+
+
+def test_bosch_e_cursos_de_outras_areas_nunca_entram():
+    bosch = Vaga(id="t:b", fonte="t", titulo="VAGA AFIRMATIVA PcD - ESTÁGIO SUPERIOR - ADMINISTRATIVO", empresa="Bosch", cidade="Campinas")
+    odonto = Vaga(id="t:o", fonte="t", titulo="ESTÁGIO EM ODONTOLOGIA - Sem experiência", empresa="Jobbol", cidade="Campinas")
+    ok = Vaga(id="t:k", fonte="t", titulo="Estágio em Qualidade", empresa="GE Vernova", cidade="Campinas")
+    assert not analise.eh_alvo(bosch, CFG) and not analise.eh_alvo(odonto, CFG) and analise.eh_alvo(ok, CFG)
