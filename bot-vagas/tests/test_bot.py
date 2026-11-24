@@ -374,3 +374,22 @@ def test_trecho_cursos_guarda_a_lista_inteira():
     t = analise.trecho_cursos(d)
     assert "mecanica" in t and "producao" in t
     assert analise.trecho_cursos(norm("Vaga legal em Campinas.")) == ""
+
+
+def test_alertas_email_viram_vagas_e_passam_pelos_filtros():
+    from bot.main import na_regiao_ou_remota
+    from bot.sources.alertas_email import vagas_das_linhas
+    linhas = [
+        {"ID": "glassdoor:1010333414737", "Fonte": "Glassdoor", "Vaga": "Estágio em Projetos", "Empresa": "MITRATECH LTDA",
+         "Cidade": "Campinas", "Link": "https://www.glassdoor.com.br/partner/jobListing.htm?jobListingId=1010333414737", "Recebido em": "2026-11-24"},
+        {"ID": "glassdoor:1", "Fonte": "Glassdoor", "Vaga": "Operador de Empilhadeira", "Empresa": "X",
+         "Cidade": "Cajamar", "Link": "https://x", "Recebido em": "2026-11-24"},
+        {"ID": "indeed:old", "Fonte": "Indeed", "Vaga": "Estágio antigo", "Empresa": "Y",
+         "Cidade": "Campinas", "Link": "https://y", "Recebido em": "2026-09-01"},
+        {"ID": "", "Vaga": "sem id", "Link": "https://z"},
+    ]
+    vs = vagas_das_linhas(linhas, HOJE)
+    assert [v.id for v in vs] == ["email:glassdoor:1010333414737", "email:glassdoor:1"]
+    assert vs[0].fonte == "Glassdoor (e-mail)" and "não confirmada" in vs[0].verificacao
+    assert na_regiao_ou_remota(vs[0], CFG) and not na_regiao_ou_remota(vs[1], CFG)
+    assert analise.eh_alvo(vs[0], CFG)

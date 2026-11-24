@@ -111,6 +111,14 @@ fapesp:
   paginas: 3
 
 # ---------------------------------------------------------------------
+# Alertas do Glassdoor e do Indeed que chegam no e-mail da Unicamp.
+# O script extras/alertas_email.gs (instalado no Gmail) escreve as vagas na aba abaixo;
+# o robô só lê a aba e aplica os mesmos filtros de região e área.
+alertas_email:
+  ativo: true
+  aba: "Alertas e-mail"
+  dias: 30          # ignora vagas recebidas há mais tempo
+
 # Empresas-alvo dos polos perto de Barão Geraldo -> aba "Empresas" da planilha
 # (quantas vagas de cada uma o bot achou + links de busca na Gupy e LinkedIn).
 # "busca" = termo usado nos links; "apelidos" = nomes que aparecem nas vagas.
