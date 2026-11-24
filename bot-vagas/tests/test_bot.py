@@ -400,3 +400,12 @@ def test_bosch_e_cursos_de_outras_areas_nunca_entram():
     odonto = Vaga(id="t:o", fonte="t", titulo="ESTÁGIO EM ODONTOLOGIA - Sem experiência", empresa="Jobbol", cidade="Campinas")
     ok = Vaga(id="t:k", fonte="t", titulo="Estágio em Qualidade", empresa="GE Vernova", cidade="Campinas")
     assert not analise.eh_alvo(bosch, CFG) and not analise.eh_alvo(odonto, CFG) and analise.eh_alvo(ok, CFG)
+
+
+def test_vaga_do_email_sempre_vai_no_telegram():
+    from bot.alertas import montar_texto
+    r = {"Nota": 49, "Tipo": "Estágio", "Empresa": "GE Vernova", "Vaga": "Estágio em Qualidade", "Link": "https://x",
+         "Cidade": "Campinas", "Modalidade": "", "Carga horária": "", "Publicação": "", "Prazo": "", "Alertas": "",
+         "Verificação": "alerta por e-mail (Glassdoor), não confirmada"}
+    t = montar_texto([r], [], [], 60, "24/11/2026")
+    assert t and "GE Vernova" in t and "do seu e-mail" in t

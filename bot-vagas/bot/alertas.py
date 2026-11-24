@@ -16,16 +16,19 @@ log = logging.getLogger(__name__)
 
 
 def montar_texto(novas: list[dict], mudancas: list[str], erros: list[str], limiar: int, hoje: str) -> str | None:
-    relevantes = [r for r in novas if int(r["Nota"]) >= limiar]
+    # jobs from the e-mail alerts always go out: Nu marks them as very important, and their
+    # score is lower only because the e-mail carries no description
+    do_email = lambda r: "alerta por e-mail" in str(r.get("Verificação", ""))  # noqa: E731
+    relevantes = [r for r in novas if int(r["Nota"]) >= limiar or do_email(r)]
     if not relevantes and not mudancas and not erros:
         return None
     linhas = [f"<b>◆ Radar de estágios · {hoje}</b>"]
     if relevantes:
-        linhas.append(f"\n<b>{len(relevantes)} nova(s) com nota ≥ {limiar}</b>")
+        linhas.append(f"\n<b>{len(relevantes)} nova(s) com nota ≥ {limiar} ou vinda(s) dos seus e-mails</b>")
         for r in sorted(relevantes, key=lambda x: -int(x["Nota"]))[:15]:
             e = lambda s: html.escape(str(s))  # noqa: E731
             linhas.append(
-                f"\n<b>{e(r['Nota'])}</b> · [{e(r.get('Tipo', 'Estágio'))}] {e(r['Empresa'])}: <a href=\"{e(r['Link'])}\">{e(r['Vaga'])}</a>\n"
+                f"\n<b>{e(r['Nota'])}</b> · [{e(r.get('Tipo', 'Estágio'))}]{' ✉ do seu e-mail ·' if do_email(r) else ''} {e(r['Empresa'])}: <a href=\"{e(r['Link'])}\">{e(r['Vaga'])}</a>\n"
                 f"{e(r['Cidade'])} · {e(r['Modalidade'])} · {e(r['Carga horária'])}\n"
                 f"Publicação: {e(iso_para_br(r['Publicação']))} · Prazo: {e(iso_para_br(r['Prazo']))}"
                 + (f"\n⚠ {e(r['Alertas'])}" if r.get("Alertas") else ""))
