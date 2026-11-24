@@ -63,11 +63,12 @@ def test_vaga_ideal_tem_nota_alta():
     assert v.recente
 
 
-def test_curso_e_jornada_desconhecidos_ficam_no_meio():
+def test_curso_desconhecido_fica_no_meio_e_estagio_tem_jornada_legal():
     v = gupy._to_vaga(job(2, "Estágio em Supply Chain", desc="Atuar com fornecedores."))
     analise.pontuar(v, CFG, HOJE)
-    assert "DESCONHECIDO" in v.detalhe_nota and "DESCONHECIDA" in v.detalhe_nota
-    assert 50 <= v.nota <= 70
+    assert "Curso 13/25 (DESCONHECIDO" in v.detalhe_nota
+    assert "Jornada 15/15 (estágio: por lei até 30h semanais)" in v.detalhe_nota
+    assert 55 <= v.nota <= 75
 
 
 def test_formatura_incompativel_gera_alerta():
@@ -424,4 +425,10 @@ def test_sao_paulo_so_hibrido_de_empresa_grande_ou_programa():
     assert not na_regiao_ou_remota(V_(empresa="Loja do Zé", cidade=""), CFG)
     assert not na_regiao_ou_remota(V_(empresa="Itaú", cidade="Rio de Janeiro", modalidade="híbrido"), CFG)
     v = analise.pontuar(V_(empresa="Itaú", cidade="São Paulo", modalidade="híbrido"), CFG, HOJE)
-    assert "Local 11/20" in v.detalhe_nota
+    assert "Local 17/20" in v.detalhe_nota and "Prioridade +5" in v.detalhe_nota
+
+
+def test_prioridades_da_nu_ficam_no_topo():
+    remoto = analise.pontuar(Vaga(id="t:r", fonte="t", empresa="Blip", titulo="Programa de Estágio 2027", modalidade="remoto",
+                                  descricao="100% remoto, horário flexível. Exatas."), CFG, HOJE)
+    assert remoto.nota >= 85 and "Prioridade +12" in remoto.detalhe_nota

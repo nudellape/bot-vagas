@@ -179,6 +179,10 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
             if len(hits_d) >= 2:
                 p_ativ, motivo = so_desc, f"descrição: {', '.join(hits_d[:3])} ({nome.replace('_', ' ')})"
                 break
+    # programs of big companies pick the area later (tracks/rotation): not knowing it is not a minus
+    grande_ou_programa = empresa_grande(v, cfg) or "programa de estagio" in titulo_n
+    if p_ativ == 8 and grande_ou_programa:
+        p_ativ, motivo = 18, "programa/empresa grande: área escolhida depois (trilhas)"
     # bônus por ferramentas que a Nu domina
     ferramentas = contains_any(desc_n, ["excel", "power bi", "python", "sql", "power query", "dashboards"])
     if ferramentas and p_ativ < 30:
@@ -227,20 +231,24 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
     mod = v.modalidade
     if "barao geraldo" in desc_n or "barao geraldo" in norm(v.cidade):
         c = "campinas"
+    grande = grande_ou_programa
+    hib_ok = {norm(x) for x in loc.get("hibrido_ok", [])}
     if c in p1:
         p_loc, m_loc = (20, f"{v.cidade} (prioridade 1), {mod or 'modalidade não informada'}")
+    elif mod == "remoto":
+        # 100% remote is as good as Campinas for Nu
+        p_loc, m_loc = (20, "remoto")
     elif c in p2:
         p_loc, m_loc = (16, f"{v.cidade} (prioridade 2), {mod or 'modalidade não informada'}")
-    elif mod == "remoto":
-        p_loc, m_loc = (15, "remoto")
-    elif c in {norm(x) for x in loc.get("hibrido_ok", [])} and mod == "híbrido":
-        p_loc, m_loc = (11, f"{v.cidade} híbrido")
+    elif c in hib_ok and mod == "híbrido":
+        p_loc, m_loc = ((17, f"{v.cidade} híbrido, empresa grande/programa") if grande else (11, f"{v.cidade} híbrido"))
         alertas.append(f"Híbrido em {v.cidade}: confirme quantos dias são presenciais.")
-    elif c in {norm(x) for x in loc.get("hibrido_ok", [])}:
-        p_loc, m_loc = (7, f"{v.cidade}, modalidade não informada")
+    elif c in hib_ok:
+        p_loc, m_loc = ((14, f"{v.cidade}, empresa grande/programa, modalidade não informada") if grande
+                        else (7, f"{v.cidade}, modalidade não informada"))
         alertas.append(f"{v.cidade}: só serve se for híbrido ou remoto. Confirme o modelo antes de se candidatar.")
     elif not c:
-        p_loc, m_loc = (8, "DESCONHECIDO: cidade não informada")
+        p_loc, m_loc = ((14, "empresa grande, cidade não informada") if grande else (8, "DESCONHECIDO: cidade não informada"))
     elif mod == "híbrido":
         p_loc, m_loc = (5, f"{v.cidade} híbrido: deslocamento NÃO verificado")
         alertas.append(f"Híbrido em {v.cidade}: verificar frequência presencial e deslocamento.")
@@ -251,7 +259,11 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
     # --- 4. Jornada (15)
     v.carga_horaria, horas = extrair_carga(desc_n)
     v.horas_semana = horas
-    if horas is None:
+    eh_estagio = tipo_vaga(v) in ("Estágio", "Programa de estágio")
+    if horas is None and eh_estagio:
+        # Lei 11.788/2008, art. 10: estágio de ensino superior tem no máximo 6 h/dia e 30 h/semana
+        p_jor, m_jor = 15, "estágio: por lei até 30h semanais"
+    elif horas is None:
         p_jor, m_jor = 8, "DESCONHECIDA: jornada não publicada, nota intermediária"
     elif horas <= 30:
         p_jor, m_jor = 15, v.carga_horaria
@@ -268,10 +280,25 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
                                     "capacitacao", "desenvolvimento profissional", "job rotation",
                                     "efetivacao", "projeto de estagio", "aprendizado", "rotacao"])
     p_apr = min(10, 4 + 2 * len(sinais)) if sinais else 4
+    if grande:
+        # big companies and internship programs come with structured training
+        sinais = ["empresa grande/programa", *sinais]
+        p_apr = 10
     v.pts_aprendizado = p_apr
     detalhes.append(f"Aprendizado {p_apr}/10 ({', '.join(sinais[:4]) if sinais else 'sem sinais explícitos'})")
 
-    v.nota = p_ativ + p_curso + p_loc + p_jor + p_apr
+    # --- Prioridade (bônus): what Nu marked as 100% of her interest
+    bonus, porque = 0, []
+    if grande_ou_programa:
+        bonus, porque = bonus + 5, porque + ["empresa grande/programa"]
+    if mod == "remoto":
+        bonus, porque = bonus + 5, porque + ["100% remoto"]
+    if contains_any(desc_n, ["horario flexivel", "horarios flexiveis", "flexibilidade de horario"]):
+        bonus, porque = bonus + 2, porque + ["horário flexível"]
+    if bonus:
+        detalhes.append(f"Prioridade +{bonus} ({', '.join(porque)})")
+
+    v.nota = min(100, p_ativ + p_curso + p_loc + p_jor + p_apr + bonus)
     v.detalhe_nota = " | ".join(detalhes)
 
     # --- outros dados
