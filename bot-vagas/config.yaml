@@ -15,6 +15,21 @@ localizacao:
   # Nu mora em Barão Geraldo (distrito de Campinas) e vai de moto 125cc: só Campinas e região próxima.
   prioridade_1: [Campinas, Paulínia, Sumaré]
   prioridade_2: [Hortolândia, Jaguariúna, Valinhos, Vinhedo]
+  # Cidades que só servem se a vaga for HÍBRIDA ou REMOTA (presencial todo dia não dá).
+  # Para não lotar de vagas pequenas de SP, só entram empresas grandes ou programas de estágio.
+  hibrido_ok: [São Paulo]
+  hibrido_ok_so_grandes: true
+
+# Empresas grandes: entram também em São Paulo (híbrido) e quando a vaga não diz a cidade.
+empresas_grandes: [itaú, itau, bradesco, santander, "banco do brasil", "caixa econômica", btg, "xp inc", nubank, "banco inter",
+  "c6 bank", stone, picpay, ambev, heineken, "coca-cola", pepsico, unilever, nestlé, nestle, "p&g", "procter",
+  danone, mondelez, "kraft heinz", "l'oréal", loreal, natura, boticário, boticario, "johnson & johnson", sanofi,
+  bayer, basf, syngenta, corteva, "john deere", cnh, agco, cargill, bunge, "louis dreyfus", "adm do brasil", yara, mosaic,
+  "fmc", "upl ", raízen, raizen, shell, petrobras, braskem, "vale s.a", suzano, klabin, gerdau, votorantim, embraer,
+  "ge vernova", siemens, schneider, abb, weg, volkswagen, "mercedes-benz", stellantis, toyota, honda, scania,
+  "mercado livre", ifood, magalu, "magazine luiza", amazon, google, microsoft, ibm, oracle, "sap brasil", "sap labs", totvs, "ci&t",
+  blip, accenture, deloitte, pwc, "ey ", kpmg, mckinsey, bain, bcg, jbs, brf, marfrig, minerva, "3m", dow,
+  "white martins", "air liquide", rhodia, solvay, syensqo, "boehringer", cpfl, "cpqd", embrapa]
 
 busca:
   # Janela máxima de publicação (dias). Vagas até 7 dias são marcadas "recente".
@@ -55,8 +70,13 @@ busca:
                     "ajudante geral", "auxiliar de limpeza", porteiro, vigilante, cozinheiro, garçom,
                     "operador de empilhadeira", "técnico de enfermagem", "auxiliar de enfermagem"]
 
+  # Gupy: buscas em São Paulo (só ficam híbridas/remotas de empresas grandes ou programas)
+  gupy_termos_hibrido_ok: ["programa de estágio", "estágio"]
+
   # Gupy: buscas nacionais para vagas REMOTAS (prioridade 3).
   gupy_termos_remotos:
+    - programa de estágio
+    - programa de estágio 2027
     - estágio dados
     - estágio BI
     - estágio business intelligence
@@ -212,3 +232,14 @@ areas_fora_do_perfil: [direito, jurídico, juridico, enfermagem, medicina, odont
                        nutrição, psicologia, pedagogia, "ensino médio", "nível técnico",
                        "curso técnico", "estágio técnico", vendas, comercial, "call center",
                        design gráfico, jornalismo, publicidade]
+
+# Programas de grandes empresas que não estão na Gupy (site próprio). Entram no app com prazo.
+# Quando um programa novo aparecer (e-mail, LinkedIn, site), é só acrescentar aqui.
+programas_destaque:
+  - empresa: Blip
+    titulo: "Programa de Estágio Blip 2027 (Estágio Tech.AI, com a Ada)"
+    link: "https://estagio.blip.ai/"
+    modalidade: remoto
+    cidade: ""
+    prazo: "2026-11-30"
+    descricao: "100% remoto, horário flexível, bolsa R$ 3.300. Ciência da Computação, Sistemas, Eng. de Software, Estatística, Eng. de Controle e Automação, Eng. de Produção ou cursos correlatos de exatas; formatura entre dez/2027 e dez/2028. Avaliação online de código e IA."

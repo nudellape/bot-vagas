@@ -125,6 +125,7 @@ def coletar(cfg: dict, session: requests.Session | None = None) -> tuple[list[Va
     if b.get("incluir_empregos"):
         termos_cidade += b.get("gupy_termos_emprego_por_cidade", [])
     consultas = ([(t, c) for c in loc["prioridade_1"] + loc["prioridade_2"] for t in termos_cidade]
+                 + [(t, c) for c in loc.get("hibrido_ok", []) for t in b.get("gupy_termos_hibrido_ok", [])]
                  + [(t, None) for t in b["gupy_termos_remotos"]])
     for termo, cidade in consultas:
         try:

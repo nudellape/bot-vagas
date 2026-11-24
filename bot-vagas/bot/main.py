@@ -20,7 +20,7 @@ import yaml
 
 from . import alertas, analise, registro
 from .models import Vaga
-from .sources import agrobase, alertas_email, alertas_google, fapesp, gupy, smartrecruiters, workday
+from .sources import agrobase, alertas_email, alertas_google, fapesp, gupy, programas, smartrecruiters, workday
 from .text import norm
 
 log = logging.getLogger("bot")
@@ -34,10 +34,20 @@ def carregar_config(caminho: str | None = None) -> dict:
 
 
 def na_regiao_ou_remota(v: Vaga, cfg: dict) -> bool:
+    """Campinas region, remote, or (São Paulo & co.) hybrid/unknown model from a big company or a program.
+    São Paulo on-site every day never enters. A big company that doesn't say the city also enters."""
     loc = cfg["localizacao"]
     cidades = {norm(c) for c in loc["prioridade_1"] + loc["prioridade_2"]}
     c = norm(v.cidade.split(",")[0].split("-")[0])
-    return c in cidades or v.modalidade == "remoto" or "barao geraldo" in norm(v.cidade)
+    if c in cidades or v.modalidade == "remoto" or "barao geraldo" in norm(v.cidade):
+        return True
+    grande = analise.empresa_grande(v, cfg)
+    programa = "programa" in norm(v.titulo)
+    if c in {norm(x) for x in loc.get("hibrido_ok", [])}:
+        if v.modalidade == "presencial":
+            return False
+        return grande or programa or not loc.get("hibrido_ok_so_grandes", True)
+    return not c and grande
 
 
 def deduplicar(vagas: list[Vaga]) -> list[Vaga]:
@@ -65,7 +75,7 @@ def coletar_tudo(cfg: dict, session: requests.Session | None = None):
     if not e_gupy:  # só considera a Gupy "completa" se nenhuma consulta falhou
         fontes_ok.add("gupy:")
     extras, extras_ids = [], set()
-    for fonte in (workday, smartrecruiters, agrobase, fapesp, alertas_google, alertas_email):
+    for fonte in (workday, smartrecruiters, agrobase, fapesp, alertas_google, alertas_email, programas):
         v, avisos, ok, ids = fonte.coletar(cfg, s)
         extras += v
         extras_ids |= ids

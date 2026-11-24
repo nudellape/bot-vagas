@@ -233,6 +233,12 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
         p_loc, m_loc = (16, f"{v.cidade} (prioridade 2), {mod or 'modalidade não informada'}")
     elif mod == "remoto":
         p_loc, m_loc = (15, "remoto")
+    elif c in {norm(x) for x in loc.get("hibrido_ok", [])} and mod == "híbrido":
+        p_loc, m_loc = (11, f"{v.cidade} híbrido")
+        alertas.append(f"Híbrido em {v.cidade}: confirme quantos dias são presenciais.")
+    elif c in {norm(x) for x in loc.get("hibrido_ok", [])}:
+        p_loc, m_loc = (7, f"{v.cidade}, modalidade não informada")
+        alertas.append(f"{v.cidade}: só serve se for híbrido ou remoto. Confirme o modelo antes de se candidatar.")
     elif not c:
         p_loc, m_loc = (8, "DESCONHECIDO: cidade não informada")
     elif mod == "híbrido":
@@ -340,6 +346,10 @@ def emprego_na_area(titulo: str, cfg: dict) -> bool:
     termos = [*a.get("muito_alta", []), *a.get("alta", []), *a.get("media", []),
               *cfg.get("busca", {}).get("emprego_titulo_tambem_aceita", [])]
     return bool(contains_any(t, termos))
+
+
+def empresa_grande(v: Vaga, cfg: dict) -> bool:
+    return bool(contains_any(norm(f" {v.empresa} {v.titulo} "), cfg.get("empresas_grandes", [])))
 
 
 def eh_alvo(v: Vaga, cfg: dict) -> bool:

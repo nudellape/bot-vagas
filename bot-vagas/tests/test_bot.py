@@ -111,7 +111,7 @@ def test_fluxo_completo_csv(tmp_path, monkeypatch):
     brutas, erros, ok = main.coletar_tudo(CFG, FakeSession(jobs))
     assert erros == [] and "gupy:" in ok
     vagas, ids = main.processar(brutas, CFG, HOJE)
-    assert sorted(v.id for v in vagas) == ["gupy:10", "gupy:14"]
+    assert sorted(v.id for v in vagas if v.id.startswith("gupy:")) == ["gupy:10", "gupy:14"]
 
     reg = registro.abrir_registro()
     linhas, novas, mud = registro.mesclar(reg.ler(), vagas, ok, "2026-11-17", ids)
@@ -409,3 +409,18 @@ def test_vaga_do_email_sempre_vai_no_telegram():
          "Verificação": "alerta por e-mail (Glassdoor), não confirmada"}
     t = montar_texto([r], [], [], 60, "24/11/2026")
     assert t and "GE Vernova" in t and "do seu e-mail" in t
+
+
+def test_sao_paulo_so_hibrido_de_empresa_grande_ou_programa():
+    from bot.main import na_regiao_ou_remota
+    V_ = lambda **k: Vaga(**{"id": "t:x", "fonte": "t", "titulo": "Estágio", "empresa": "X", **k})  # noqa: E731
+    assert na_regiao_ou_remota(V_(empresa="Itaú Unibanco", cidade="São Paulo", modalidade="híbrido"), CFG)
+    assert not na_regiao_ou_remota(V_(empresa="Itaú Unibanco", cidade="São Paulo", modalidade="presencial"), CFG)
+    assert na_regiao_ou_remota(V_(empresa="Itaú Unibanco", cidade="São Paulo", modalidade=""), CFG)
+    assert not na_regiao_ou_remota(V_(empresa="Loja do Zé", cidade="São Paulo", modalidade="híbrido"), CFG)
+    assert na_regiao_ou_remota(V_(titulo="Programa de Estágio 2027", empresa="Loja do Zé", cidade="São Paulo", modalidade="híbrido"), CFG)
+    assert na_regiao_ou_remota(V_(titulo="Programa de Estágio Corporativo", empresa="Itaú Unibanco", cidade=""), CFG)
+    assert not na_regiao_ou_remota(V_(empresa="Loja do Zé", cidade=""), CFG)
+    assert not na_regiao_ou_remota(V_(empresa="Itaú", cidade="Rio de Janeiro", modalidade="híbrido"), CFG)
+    v = analise.pontuar(V_(empresa="Itaú", cidade="São Paulo", modalidade="híbrido"), CFG, HOJE)
+    assert "Local 11/20" in v.detalhe_nota
