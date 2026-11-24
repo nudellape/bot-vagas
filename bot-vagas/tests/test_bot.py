@@ -100,6 +100,7 @@ def test_bi_nao_casa_com_biologia_e_intern_nao_casa_com_interno():
 
 def test_fluxo_completo_csv(tmp_path, monkeypatch):
     monkeypatch.setenv("CSV_PATH", str(tmp_path / "vagas.csv"))
+    monkeypatch.setitem(CFG, "programas_destaque", [])  # only Gupy in this flow
     jobs = [
         job(10, "Estágio em Melhoria Contínua", desc="Engenharias. 6 horas por dia."),
         job(10, "Estágio em Melhoria Contínua", desc="Engenharias. 6 horas por dia."),       # duplicata
@@ -111,7 +112,7 @@ def test_fluxo_completo_csv(tmp_path, monkeypatch):
     brutas, erros, ok = main.coletar_tudo(CFG, FakeSession(jobs))
     assert erros == [] and "gupy:" in ok
     vagas, ids = main.processar(brutas, CFG, HOJE)
-    assert sorted(v.id for v in vagas if v.id.startswith("gupy:")) == ["gupy:10", "gupy:14"]
+    assert sorted(v.id for v in vagas) == ["gupy:10", "gupy:14"]
 
     reg = registro.abrir_registro()
     linhas, novas, mud = registro.mesclar(reg.ler(), vagas, ok, "2026-11-17", ids)
