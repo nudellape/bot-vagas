@@ -167,6 +167,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if not a.sem_alerta:
         texto = alertas.montar_texto(novas, mudancas, erros, cfg["perfil"]["limiar_alerta"], hoje.strftime("%d/%m/%Y"))
+        manual = os.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch"
+        if not texto and manual:  # manual run: always answer, so the link below arrives
+            texto = f"<b>◆ Radar de vagas · {hoje.strftime('%d/%m/%Y')}</b>\nRodada manual: nada novo acima do limiar."
+        if texto and os.getenv("SHEET_ID"):
+            # the link only reaches the private chat; it opens only for accounts the sheet is shared with
+            texto += f'\n\n<a href="https://docs.google.com/spreadsheets/d/{os.getenv("SHEET_ID")}/edit">Abrir a planilha do robô</a>'
         if texto:
             canais = alertas.enviar(texto, f"Vagas de estágio: {len(novas)} nova(s) · {hoje.strftime('%d/%m')}")
             log.info("alerta enviado por: %s", ", ".join(canais) or "nenhum canal configurado")
