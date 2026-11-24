@@ -55,7 +55,7 @@ busca:
   # Títulos com estes termos são descartados (cargo acima do nível de entrada ou fora do alvo)
   # Empresas que a Nu não quer (vale também para vagas publicadas por recrutadoras)
   excluir_empresas: [bosch]
-  excluir_titulos: [pleno, sênior, senior, " sr ", " sr.", especialista, coordenador, coordenadora,
+  excluir_titulos: [pleno, sênior, senior, " sr ", " sr.", " pl ", " pl |", " pl -", " ii ", " iii ", especialista, coordenador, coordenadora,
                     gerente, supervisor, supervisora, líder, lider, diretor, diretora, head,
                     "jovem aprendiz", aprendiz, "pcd exclusiva",
                     # cursos que não são da Nu:
@@ -233,7 +233,8 @@ areas_fora_do_perfil: [direito, jurídico, juridico, enfermagem, medicina, odont
                        "curso técnico", "estágio técnico", vendas, comercial, "call center",
                        design gráfico, jornalismo, publicidade]
 
-# Programas de grandes empresas que não estão na Gupy (site próprio). Entram no app com prazo.
+# Programas e vagas importantes cadastrados à mão (site próprio, ou da Gupy sem cidade, que a busca não pega).
+# Entram no app com prazo; saem sozinhos quando o prazo passa.
 # Quando um programa novo aparecer (e-mail, LinkedIn, site), é só acrescentar aqui.
 programas_destaque:
   - empresa: Blip
@@ -243,3 +244,17 @@ programas_destaque:
     cidade: ""
     prazo: "2026-11-30"
     descricao: "100% remoto, horário flexível, bolsa R$ 3.300. Ciência da Computação, Sistemas, Eng. de Software, Estatística, Eng. de Controle e Automação, Eng. de Produção ou cursos correlatos de exatas; formatura entre dez/2027 e dez/2028. Avaliação online de código e IA."
+  - empresa: Itaú Unibanco
+    titulo: "Programa de Estágio Corporativo (banco de talentos)"
+    link: "https://vemproitau.gupy.io/jobs/11511312"
+    modalidade: ""
+    cidade: "São Paulo"
+    prazo: ""
+    descricao: "Cadastro no banco de talentos do estágio corporativo do Itaú; vagas abrem todos os dias durante o semestre. Modelo híbrido ou presencial, a depender da área. Cursos de exatas ou humanas ligados à carreira escolhida. Estágio de 6 horas por dia; disponibilidade mínima de 6 meses antes da formatura. Cadastro e testes obrigatórios."
+  - empresa: Itaú Unibanco
+    titulo: "Estagiário 6h: Operação de Daily Banking Pagamentos"
+    link: "https://vemproitau.gupy.io/jobs/12760537"
+    modalidade: ""
+    cidade: "São Paulo"
+    prazo: ""
+    descricao: "Cursando Administração, Ciência da Computação, Engenharia, Gestão, TI, Sistemas de Informação ou áreas afins. Desejável Excel (PROCV, PROCX, tabela dinâmica) e interesse em dados e indicadores; diferenciais AWS e IA/automação. Local e modelo não informados."
