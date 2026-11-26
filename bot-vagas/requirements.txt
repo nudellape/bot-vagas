@@ -4,3 +4,4 @@ gspread>=6.0
 google-auth>=2.29
 pytest>=8.0
 defusedxml>=0.7
+beautifulsoup4>=4.12

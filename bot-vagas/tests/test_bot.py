@@ -475,3 +475,55 @@ def test_eureca_converte_itens():
     assert a.modalidade == "remoto" and a.prazo == "2026-12-07" and "30 horas" in a.descricao
     assert "Programa de Estágio Grupo Fleury 2027" in a.titulo and a.link.endswith("/vagas/a1")
     assert c.cidade == "Campinas" and c.modalidade == "híbrido"
+
+
+def test_99jobs_cartoes_e_detalhe():
+    from bot.sources import noventaenove as n
+    html = ('<a class="opportunity-card" href="https://99jobs.com/grupo-boticario/jobs/518243-programa-de-estagio">'
+            '<div class="opportunity-card-content"><h1>Programa de Estágio Grupo Boticário 2...</h1>'
+            '<div class="opportunity-labels"><span class="opportunity-label opportunity-label-level"> Estágio </span>'
+            '<span class="opportunity-label opportunity-label-acting-mode">Híbrido</span></div>'
+            '<div class="opportunity-address"><p> Não informado </p></div>'
+            '<div class="opportunity-company-infos"><h2> O BOTICARIO FRANCHISING LTDA </h2></div></div></a>'
+            '<a class="opportunity-card" href="https://bluefit.99jobs.com/vagas/520419-estagio-ed-fisica">'
+            '<h1>Estágio em Educação Física</h1><span class="opportunity-label-level">Estágio</span>'
+            '<span class="opportunity-label-acting-mode">Presencial</span>'
+            '<div class="opportunity-address"><p> Goiânia, GO </p></div></a>')
+    cs = n.cartoes(html)
+    assert [c["id"] for c in cs] == ["518243", "520419"]
+    assert cs[0]["modelo"] == "Híbrido" and cs[1]["cidade"] == "Goiânia" and cs[1]["estado"] == "GO"
+    assert n._interessa(cs[0], {"campinas"}, {"sao paulo"}) and not n._interessa(cs[1], {"campinas"}, {"sao paulo"})
+    t, d = n.detalhe('<div class="opportunities-details"><h2>Programa de Estágio Grupo Boticário 2027.1</h2>'
+                     '<div class="content-admin"><ul><li>Bolsa auxílio: R$ 2.300</li></ul></div></div>')
+    assert t.endswith("2027.1") and "2.300" in d
+
+
+def test_cia_de_talentos_so_abertos():
+    from datetime import date
+    from bot.sources import ciadetalentos as c
+    itens = [
+        {"opportunityId": 1, "opportunityName": "Estágio Administrativo-Fiscal", "hiringType": None,
+         "companyName": "Givaudan", "opportunityLocations": "São Paulo", "opportunityInscriptionEnd": True,
+         "countFinishDays": 1, "opportunityHotsiteUrl": "https://x/g"},
+        {"opportunityId": 2, "opportunityName": "Programa de Estágio Bayer", "hiringType": "Estágio Superior",
+         "companyName": "Bayer", "opportunityLocations": "Localidade: Diversas", "opportunityInscriptionEnd": False,
+         "countFinishDays": -150},
+        {"opportunityId": 3, "opportunityName": "Programa Trainee", "hiringType": "Trainee",
+         "opportunityInscriptionEnd": True, "countFinishDays": 3},
+    ]
+    vs = c.vagas_dos_itens(itens, date(2026, 11, 26))
+    assert [v.id for v in vs] == ["cia:1"] and vs[0].prazo == "2026-11-27" and vs[0].cidade == "São Paulo"
+    assert c._cidade("Localidade: Diversas") == ""
+
+
+def test_vagascom_pagina():
+    from bot.sources import vagascom as vc
+    html = ('<li class="vaga odd"><h2 class="cargo"><a class="link-detalhes-vaga" '
+            'href="/vagas/v2841553/estagio-contabil">Estagio Contábil</a></h2><span class="emprVaga"> Synchro </span>'
+            '<span class="nivelVaga"> Estágio </span><div class="detalhes"><p>estudante da área contábil</p></div>'
+            '<footer><div class="vaga-local">Campinas / SP <div class="tooltip-place">aceita qualquer cidade</div>'
+            '</div><span class="data-publicacao">30/10/2026</span></footer></li>')
+    (v,) = vc.vagas_da_pagina(html)
+    assert v.id == "vagascom:v2841553" and v.cidade == "Campinas" and v.estado == "SP"
+    assert v.publicada_em == "2026-10-30" and v.empresa == "Synchro" and v.link.startswith("https://www.vagas.com.br/")
+    assert vc.slug("Paulínia") == "paulinia" and vc.slug("São Paulo") == "sao-paulo"
