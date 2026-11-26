@@ -63,12 +63,15 @@ def _to_vaga(j: dict) -> Vaga:
 
 
 def _paginar(url: str, job_name: str, city: str | None, max_paginas: int, pausa: float,
-             s: requests.Session) -> list[Vaga]:
+             s: requests.Session, remoto: bool = False) -> list[Vaga]:
     vagas: list[Vaga] = []
     for pagina in range(max_paginas):
         params = {"jobName": job_name, "limit": PAGE, "offset": pagina * PAGE}
         if city:
             params["city"] = city
+        if remoto:
+            # portal's own filter for remote jobs; if the API rejects it, buscar() retries without it
+            params["workplaceTypes[]"] = "remote"
         r = s.get(url, params=params, headers=HEADERS, timeout=30)
         if getattr(r, "status_code", 200) >= 400:
             corpo = (getattr(r, "text", "") or "")[:200].replace("\n", " ")
@@ -84,25 +87,32 @@ def _paginar(url: str, job_name: str, city: str | None, max_paginas: int, pausa:
 
 
 def buscar(job_name: str, *, city: str | None = None, max_paginas: int = 15, pausa: float = 1.0,
-           session: requests.Session | None = None) -> list[Vaga]:
+           session: requests.Session | None = None, remoto: bool = False) -> list[Vaga]:
     """Tenta: (termo, cidade) -> (termo sem acento, cidade) -> (termo sem acento, sem cidade).
+    With remoto=True, first asks the portal for remote jobs only, then falls back to no filter.
     Lança a última exceção se todas falharem."""
     s = session or requests.Session()
     sem_acento = norm(job_name)
-    tentativas = [(job_name, city)]
+    tentativas = [(job_name, city, False)]
     if sem_acento != job_name.lower():
-        tentativas.append((sem_acento, city))
+        tentativas.append((sem_acento, city, False))
     if city:
-        tentativas.append((sem_acento, None))
+        tentativas.append((sem_acento, None, False))
+    if remoto:
+        tentativas.insert(0, (job_name, city, True))
     global _endpoint_ok
     urls = [_endpoint_ok] if _endpoint_ok else ENDPOINTS
     ultimo_erro: Exception | None = None
     for url in urls:
-        for termo, cid in tentativas:
+        for termo, cid, rem in tentativas:
             try:
-                vagas = _paginar(url, termo, cid, max_paginas, pausa, s)
+                vagas = _paginar(url, termo, cid, max_paginas, pausa, s, rem)
+                if rem and vagas and sum(v.modalidade == "remoto" for v in vagas) < len(vagas) * 0.8:
+                    # the API ignored the filter: keep the results, the local filter handles them
+                    log.info("gupy: filtro de remoto ignorado pela API (jobName=%r)", termo)
                 _endpoint_ok = url
-                log.info("gupy %s jobName=%r city=%r -> %d", url, termo, cid, len(vagas))
+                log.info("gupy %s jobName=%r city=%r remoto=%s -> %d (remotas: %d)", url, termo, cid, rem,
+                         len(vagas), sum(v.modalidade == "remoto" for v in vagas))
                 return vagas
             except Exception as e:  # noqa: BLE001
                 ultimo_erro = e
@@ -127,9 +137,12 @@ def coletar(cfg: dict, session: requests.Session | None = None) -> tuple[list[Va
     consultas = ([(t, c) for c in loc["prioridade_1"] + loc["prioridade_2"] for t in termos_cidade]
                  + [(t, c) for c in loc.get("hibrido_ok", []) for t in b.get("gupy_termos_hibrido_ok", [])]
                  + [(t, None) for t in b["gupy_termos_remotos"]])
-    for termo, cidade in consultas:
+    consultas = [(t, c, False, maxp) for t, c in consultas]
+    # every remote internship in Brazil: broad terms, remote filter, more pages
+    consultas += [(t, None, True, b.get("max_paginas_remoto", 40)) for t in b.get("gupy_termos_estagio_remoto", [])]
+    for termo, cidade, remoto, paginas in consultas:
         try:
-            out.extend(buscar(termo, city=cidade, max_paginas=maxp, pausa=pausa, session=s))
+            out.extend(buscar(termo, city=cidade, max_paginas=paginas, pausa=pausa, session=s, remoto=remoto))
         except Exception as e:  # noqa: BLE001
             erros.append(f"gupy '{termo}' {cidade or 'nacional'}: {e}")
             log.warning("falha gupy %s %s: %s", termo, cidade or "nacional", e)

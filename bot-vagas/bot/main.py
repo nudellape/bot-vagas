@@ -21,7 +21,7 @@ import yaml
 from . import alertas, analise, registro
 from .models import Vaga
 from .sources import agrobase, alertas_email, alertas_google, fapesp, gupy, programas, smartrecruiters, workday
-from .text import norm
+from .text import contains_any, norm
 
 log = logging.getLogger("bot")
 TZ = ZoneInfo("America/Sao_Paulo")
@@ -31,6 +31,20 @@ def carregar_config(caminho: str | None = None) -> dict:
     caminho = caminho or os.getenv("CONFIG_PATH") or str(Path(__file__).resolve().parent.parent / "config.yaml")
     with open(caminho, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+_REMOTO = ["100% remoto", "100% home office", "trabalho remoto", "estagio remoto", "vaga remota", "home office",
+           "remoto", "remote", "teletrabalho"]
+_NAO_REMOTO = ["hibrido", "presencial", "hybrid", "on-site"]
+
+
+def inferir_modalidade(v: Vaga) -> None:
+    """Sources outside Gupy rarely set the model: read 'remoto'/'home office' from the title or first lines."""
+    if v.modalidade:
+        return
+    t = norm(f"{v.titulo} {v.descricao[:400]}")
+    if contains_any(t, _REMOTO) and not contains_any(t, _NAO_REMOTO):
+        v.modalidade = "remoto"
 
 
 def na_regiao_ou_remota(v: Vaga, cfg: dict) -> bool:
@@ -88,6 +102,8 @@ def coletar_tudo(cfg: dict, session: requests.Session | None = None):
 
 def processar(brutas: list[Vaga], cfg: dict, hoje) -> tuple[list[Vaga], set[str]]:
     ids_abertos = {v.id for v in brutas} | getattr(coletar_tudo, "ids_extras", set())
+    for v in brutas:
+        inferir_modalidade(v)
     vagas = [v for v in deduplicar(brutas)
              if analise.eh_alvo(v, cfg) and na_regiao_ou_remota(v, cfg) and analise.dentro_da_janela(v, cfg, hoje)]
     for v in vagas:

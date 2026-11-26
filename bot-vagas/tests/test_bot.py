@@ -432,3 +432,18 @@ def test_prioridades_da_nu_ficam_no_topo():
     remoto = analise.pontuar(Vaga(id="t:r", fonte="t", empresa="Blip", titulo="Programa de Estágio 2027", modalidade="remoto",
                                   descricao="100% remoto, horário flexível. Exatas."), CFG, HOJE)
     assert remoto.nota >= 85 and "Prioridade +12" in remoto.detalhe_nota
+
+
+def test_estagio_remoto_vale_90_e_remoto_escrito_no_titulo_conta():
+    from bot.main import inferir_modalidade, na_regiao_ou_remota
+    v = Vaga(id="t:rr", fonte="google_alertas", empresa="Startup X", titulo="Estágio em Marketing - 100% remoto",
+             cidade="Florianópolis", descricao="Vaga 100% remota.")
+    inferir_modalidade(v)
+    assert v.modalidade == "remoto" and na_regiao_ou_remota(v, CFG)
+    v2 = Vaga(id="t:rr2", fonte="gupy", empresa="Startup X", titulo="Estágio em Atendimento", modalidade="remoto",
+              cidade="Recife", tipo="vacancy_type_internship")
+    analise.pontuar(v2, CFG, HOJE)
+    assert v2.nota >= 90
+    h = Vaga(id="t:h", fonte="t", empresa="X", titulo="Estágio híbrido ou remoto", descricao="modelo híbrido")
+    inferir_modalidade(h)
+    assert h.modalidade == ""

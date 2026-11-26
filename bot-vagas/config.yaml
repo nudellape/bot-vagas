@@ -74,6 +74,11 @@ busca:
   gupy_termos_hibrido_ok: ["programa de estágio", "estágio"]
 
   # Gupy: buscas nacionais para vagas REMOTAS (prioridade 3).
+  # Todo estágio 100% remoto do Brasil (termos amplos + filtro de remoto da Gupy).
+  # A Nu quer TODOS os estágios remotos no site.
+  gupy_termos_estagio_remoto: ["estágio", "estagiário", "estagiária", "estágio remoto", "estágio home office", "estagio 100% remoto"]
+  max_paginas_remoto: 40
+
   gupy_termos_remotos:
     - programa de estágio
     - programa de estágio 2027

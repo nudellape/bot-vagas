@@ -299,6 +299,13 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
         detalhes.append(f"Prioridade +{bonus} ({', '.join(porque)})")
 
     v.nota = min(100, p_ativ + p_curso + p_loc + p_jor + p_apr + bonus)
+    # Nu: any 100% remote internship is worth ~90. Floor at 90, unless the course or graduation
+    # year clearly doesn't fit (then 75, still high, with the reason in the alerts).
+    if mod == "remoto" and eh_estagio:
+        piso = 90 if p_curso >= 13 else 75
+        if v.nota < piso:
+            detalhes.append(f"Piso de estágio 100% remoto: {piso}")
+            v.nota = piso
     v.detalhe_nota = " | ".join(detalhes)
 
     # --- outros dados
