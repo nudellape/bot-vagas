@@ -29,6 +29,41 @@ ENDPOINTS = [
     "https://portal.api.gupy.io/api/v1/jobs",
 ]
 _endpoint_ok: str | None = None  # memoriza o endereço que funcionou nesta execução
+
+# Remote filter: the portal's parameter name is not documented. Probe these (endpoint, params) once per
+# run and keep the first that really returns remote jobs (>= 80% of a page).
+CANDIDATOS_REMOTO = [
+    ("https://portal.gupy.io/api/job-search/jobs", {"workplaceType": "remote"}),
+    ("https://portal.gupy.io/api/job-search/jobs", {"workplaceTypes": "remote"}),
+    ("https://portal.gupy.io/api/job-search/jobs", {"isRemoteWork": "true"}),
+    ("https://portal.api.gupy.io/api/v1/jobs", {"workplaceType": "remote"}),
+    ("https://employability-portal.gupy.io/api/v1/jobs", {"workplaceType": "remote"}),
+    ("https://portal.gupy.io/api/job-search/jobs", {"workplaceTypes[]": "remote"}),
+]
+_remoto_ok: tuple[str, dict] | None | bool = None  # None = not probed; False = nothing works
+
+
+def descobrir_filtro_remoto(s: requests.Session, pausa: float = 0.5) -> tuple[str, dict] | None:
+    global _remoto_ok
+    if _remoto_ok is not None:
+        return _remoto_ok or None
+    for url, extra in CANDIDATOS_REMOTO:
+        try:
+            r = s.get(url, params={"jobName": "estágio", "limit": PAGE, "offset": 0, **extra}, headers=HEADERS, timeout=30)
+            if getattr(r, "status_code", 200) >= 400:
+                log.info("filtro remoto %s %s: HTTP %s", url, extra, r.status_code)
+                continue
+            dados = (r.json() or {}).get("data") or []
+            remotas = sum(_to_vaga(j).modalidade == "remoto" for j in dados)
+            log.info("filtro remoto %s %s: %d/%d remotas", url, extra, remotas, len(dados))
+            if dados and remotas >= 0.8 * len(dados):
+                _remoto_ok = (url, extra)
+                return _remoto_ok
+        except Exception as e:  # noqa: BLE001
+            log.info("filtro remoto %s %s: %s", url, extra, e)
+        time.sleep(pausa)
+    _remoto_ok = False
+    return None
 PAGE = 10  # tamanho de página aceito pelo portal
 HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -69,9 +104,8 @@ def _paginar(url: str, job_name: str, city: str | None, max_paginas: int, pausa:
         params = {"jobName": job_name, "limit": PAGE, "offset": pagina * PAGE}
         if city:
             params["city"] = city
-        if remoto:
-            # portal's own filter for remote jobs; if the API rejects it, buscar() retries without it
-            params["workplaceTypes[]"] = "remote"
+        if remoto and isinstance(_remoto_ok, tuple):
+            params.update(_remoto_ok[1])
         r = s.get(url, params=params, headers=HEADERS, timeout=30)
         if getattr(r, "status_code", 200) >= 400:
             corpo = (getattr(r, "text", "") or "")[:200].replace("\n", " ")
@@ -102,15 +136,20 @@ def buscar(job_name: str, *, city: str | None = None, max_paginas: int = 15, pau
         tentativas.insert(0, (job_name, city, True))
     global _endpoint_ok
     urls = [_endpoint_ok] if _endpoint_ok else ENDPOINTS
+    if remoto:
+        achado = descobrir_filtro_remoto(s)
+        if achado:
+            urls = [achado[0]]
+            tentativas = [(job_name, city, True)]
+        else:
+            tentativas = [t for t in tentativas if not t[2]]
     ultimo_erro: Exception | None = None
     for url in urls:
         for termo, cid, rem in tentativas:
             try:
                 vagas = _paginar(url, termo, cid, max_paginas, pausa, s, rem)
-                if rem and vagas and sum(v.modalidade == "remoto" for v in vagas) < len(vagas) * 0.8:
-                    # the API ignored the filter: keep the results, the local filter handles them
-                    log.info("gupy: filtro de remoto ignorado pela API (jobName=%r)", termo)
-                _endpoint_ok = url
+                if not rem:
+                    _endpoint_ok = url
                 log.info("gupy %s jobName=%r city=%r remoto=%s -> %d (remotas: %d)", url, termo, cid, rem,
                          len(vagas), sum(v.modalidade == "remoto" for v in vagas))
                 return vagas
