@@ -20,7 +20,7 @@ import yaml
 
 from . import alertas, analise, registro
 from .models import Vaga
-from .sources import agrobase, alertas_email, alertas_google, fapesp, gupy, programas, smartrecruiters, workday
+from .sources import agrobase, alertas_email, alertas_google, eureca, fapesp, gupy, programas, smartrecruiters, workday
 from .text import contains_any, norm
 
 log = logging.getLogger("bot")
@@ -89,7 +89,7 @@ def coletar_tudo(cfg: dict, session: requests.Session | None = None):
     if not e_gupy:  # só considera a Gupy "completa" se nenhuma consulta falhou
         fontes_ok.add("gupy:")
     extras, extras_ids = [], set()
-    for fonte in (workday, smartrecruiters, agrobase, fapesp, alertas_google, alertas_email, programas):
+    for fonte in (workday, smartrecruiters, eureca, agrobase, fapesp, alertas_google, alertas_email, programas):
         v, avisos, ok, ids = fonte.coletar(cfg, s)
         extras += v
         extras_ids |= ids

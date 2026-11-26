@@ -454,3 +454,24 @@ def test_vaga_da_gupy_antiga_mas_aberta_continua():
     assert analise.dentro_da_janela(v, CFG, HOJE)
     w = Vaga(id="x:old", fonte="agrobase", empresa="X", titulo="Estágio", publicada_em="2026-05-01")
     assert not analise.dentro_da_janela(w, CFG, HOJE)
+
+
+def test_eureca_converte_itens():
+    from bot.sources import eureca
+    itens = [
+        {"id": "a1", "name": "Estágio em TI | Data & Analytics", "companyName": "Grupo Fleury",
+         "programName": "Programa de Estágio Grupo Fleury 2027", "workModel": "remoto", "workModels": ["remoto"],
+         "locations": {"states": ["SP"], "cities": ["São Paulo"]}, "weeklyHours": 30,
+         "contractTypeKey": "internship", "description": "<p>Python e SQL</p>",
+         "createdAt": "2026-11-24 16:36:49+00", "endApplying": "2026-12-08T02:59:00.000Z"},
+        {"id": "b2", "name": "Jovem Aprendiz", "companyName": "MRS", "workModels": ["presencial"],
+         "contractTypeKey": "young-apprentice", "locations": {}},
+        {"id": "c3", "name": "Estágio em Engenharia", "companyName": "X", "workModels": ["presencial", "hibrido"],
+         "locations": {"states": ["SP"], "cities": ["Jundiaí", "Campinas"]}, "contractTypeKey": "internship"},
+    ]
+    vs = eureca.vagas_dos_itens(itens, {"campinas"})
+    assert [v.id for v in vs] == ["eureca:a1", "eureca:c3"]
+    a, c = vs
+    assert a.modalidade == "remoto" and a.prazo == "2026-12-07" and "30 horas" in a.descricao
+    assert "Programa de Estágio Grupo Fleury 2027" in a.titulo and a.link.endswith("/vagas/a1")
+    assert c.cidade == "Campinas" and c.modalidade == "híbrido"

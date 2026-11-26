@@ -26,7 +26,7 @@ empresas_grandes: [itaú, itau, bradesco, santander, "banco do brasil", "caixa e
   danone, mondelez, "kraft heinz", "l'oréal", loreal, natura, boticário, boticario, "johnson & johnson", sanofi,
   bayer, basf, syngenta, corteva, "john deere", cnh, agco, cargill, bunge, "louis dreyfus", "adm do brasil", yara, mosaic,
   "fmc", "upl ", raízen, raizen, shell, petrobras, braskem, "vale s.a", suzano, klabin, gerdau, votorantim, embraer,
-  "ge vernova", siemens, schneider, abb, weg, volkswagen, "mercedes-benz", stellantis, toyota, honda, scania,
+  "ge vernova", "grupo fleury", fleury, motiva, "slc agricola", "slc agrícola", pagbank, mrs, siemens, schneider, abb, weg, volkswagen, "mercedes-benz", stellantis, toyota, honda, scania,
   "mercado livre", ifood, magalu, "magazine luiza", amazon, google, microsoft, ibm, oracle, "sap brasil", "sap labs", totvs, "ci&t",
   blip, accenture, deloitte, pwc, "ey ", kpmg, mckinsey, bain, bcg, jbs, brf, marfrig, minerva, "3m", dow,
   "white martins", "air liquide", rhodia, solvay, syensqo, "boehringer", cpfl, "cpqd", embrapa]
@@ -54,7 +54,7 @@ busca:
                                  estoque, inventário, inventario, "planejamento de demanda", "plan"]
   # Títulos com estes termos são descartados (cargo acima do nível de entrada ou fora do alvo)
   # Empresas que a Nu não quer (vale também para vagas publicadas por recrutadoras)
-  excluir_empresas: [bosch]
+  excluir_empresas: [bosch, eureca]   # "eureca": comunidade de talentos da própria plataforma, não é vaga
   excluir_titulos: [pleno, sênior, senior, " sr ", " sr.", " pl ", " pl |", " pl -", " ii ", " iii ", especialista, coordenador, coordenadora,
                     gerente, supervisor, supervisora, líder, lider, diretor, diretora, head,
                     "jovem aprendiz", aprendiz, "pcd exclusiva",
