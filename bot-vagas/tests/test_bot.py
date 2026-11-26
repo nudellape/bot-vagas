@@ -447,3 +447,10 @@ def test_estagio_remoto_vale_90_e_remoto_escrito_no_titulo_conta():
     h = Vaga(id="t:h", fonte="t", empresa="X", titulo="Estágio híbrido ou remoto", descricao="modelo híbrido")
     inferir_modalidade(h)
     assert h.modalidade == ""
+
+
+def test_vaga_da_gupy_antiga_mas_aberta_continua():
+    v = Vaga(id="gupy:old", fonte="gupy", empresa="Geopixel", titulo="Estágio em Geoprocessamento", publicada_em="2026-05-01")
+    assert analise.dentro_da_janela(v, CFG, HOJE)
+    w = Vaga(id="x:old", fonte="agrobase", empresa="X", titulo="Estágio", publicada_em="2026-05-01")
+    assert not analise.dentro_da_janela(w, CFG, HOJE)

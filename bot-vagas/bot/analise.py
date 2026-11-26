@@ -336,8 +336,10 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
 
 
 def dentro_da_janela(v: Vaga, cfg: dict, hoje: date | None = None) -> bool:
-    """Sem data publicada => mantém (não dá para afirmar que é antiga)."""
-    if not v.publicada_em:
+    """Sem data publicada => mantém (não dá para afirmar que é antiga).
+    Gupy only lists jobs with applications open, so an old publication date doesn't mean closed:
+    the window doesn't apply to it (it hid 23 open remote internships)."""
+    if not v.publicada_em or v.fonte == "gupy":
         return True
     hoje = hoje or date.today()
     try:
