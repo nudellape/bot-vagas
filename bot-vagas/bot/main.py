@@ -104,6 +104,13 @@ def processar(brutas: list[Vaga], cfg: dict, hoje) -> tuple[list[Vaga], set[str]
     ids_abertos = {v.id for v in brutas} | getattr(coletar_tudo, "ids_extras", set())
     for v in brutas:
         inferir_modalidade(v)
+    # diagnostic: why remote internships stay out (Nu wants all of them)
+    for v in deduplicar(brutas):
+        if v.modalidade == "remoto" and "estagi" in norm(v.titulo):
+            motivo = ("título/empresa excluída" if not analise.eh_alvo(v, cfg) else
+                      "fora da janela de publicação" if not analise.dentro_da_janela(v, cfg, hoje) else "")
+            if motivo:
+                log.info("estágio remoto fora: %s | %s | %s", motivo, v.empresa, v.titulo)
     vagas = [v for v in deduplicar(brutas)
              if analise.eh_alvo(v, cfg) and na_regiao_ou_remota(v, cfg) and analise.dentro_da_janela(v, cfg, hoje)]
     for v in vagas:
