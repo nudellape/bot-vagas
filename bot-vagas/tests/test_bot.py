@@ -430,20 +430,26 @@ def test_sao_paulo_so_hibrido_de_empresa_grande_ou_programa():
 
 def test_prioridades_da_nu_ficam_no_topo():
     remoto = analise.pontuar(Vaga(id="t:r", fonte="t", empresa="Blip", titulo="Programa de Estágio 2027", modalidade="remoto",
-                                  descricao="100% remoto, horário flexível. Exatas."), CFG, HOJE)
-    assert remoto.nota >= 85 and "Prioridade +12" in remoto.detalhe_nota
+                                  descricao="100% remoto, horário flexível. Eng. de Produção ou exatas."), CFG, HOJE)
+    assert remoto.nota >= 95 and "Prioridade +12" in remoto.detalhe_nota
 
 
-def test_estagio_remoto_vale_90_e_remoto_escrito_no_titulo_conta():
+def test_remoto_que_nao_cita_engenharia_nao_e_prioridade():
     from bot.main import inferir_modalidade, na_regiao_ou_remota
     v = Vaga(id="t:rr", fonte="google_alertas", empresa="Startup X", titulo="Estágio em Marketing - 100% remoto",
              cidade="Florianópolis", descricao="Vaga 100% remota.")
     inferir_modalidade(v)
     assert v.modalidade == "remoto" and na_regiao_ou_remota(v, CFG)
-    v2 = Vaga(id="t:rr2", fonte="gupy", empresa="Startup X", titulo="Estágio em Atendimento", modalidade="remoto",
-              cidade="Recife", tipo="vacancy_type_internship")
-    analise.pontuar(v2, CFG, HOJE)
-    assert v2.nota >= 90
+    sem = analise.pontuar(Vaga(id="t:rr2", fonte="gupy", empresa="Startup X", titulo="Estágio em Atendimento",
+                               modalidade="remoto", cidade="Recife", tipo="vacancy_type_internship",
+                               descricao="Cursando Administração ou Marketing."), CFG, HOJE)
+    com = analise.pontuar(Vaga(id="t:rr3", fonte="gupy", empresa="Startup X", titulo="Estágio em Operações",
+                               modalidade="remoto", cidade="Recife", tipo="vacancy_type_internship",
+                               descricao="Cursando Engenharia de Produção, Agrícola ou afins."), CFG, HOJE)
+    assert sem.nota <= analise.TETO_SEM_ENGENHARIA
+    assert com.nota >= 90 > sem.nota
+    dados = analise.extrair_cursos("estagio em engenharia de dados. cursando administracao ou economia")[1]
+    assert dados == "lista"
     h = Vaga(id="t:h", fonte="t", empresa="X", titulo="Estágio híbrido ou remoto", descricao="modelo híbrido")
     inferir_modalidade(h)
     assert h.modalidade == ""
@@ -527,3 +533,17 @@ def test_vagascom_pagina():
     assert v.id == "vagascom:v2841553" and v.cidade == "Campinas" and v.estado == "SP"
     assert v.publicada_em == "2026-10-30" and v.empresa == "Synchro" and v.link.startswith("https://www.vagas.com.br/")
     assert vc.slug("Paulínia") == "paulinia" and vc.slug("São Paulo") == "sao-paulo"
+
+
+def test_bolsa_publicada_ou_estimada():
+    pub = analise.pontuar(Vaga(id="t:b1", fonte="t", empresa="Blip", titulo="Programa de Estágio 2027", modalidade="remoto",
+                               descricao="100% remoto, bolsa R$ 3.300. Eng. de Produção."), CFG, HOJE)
+    assert pub.bolsa_estimada == "R$ 3.300 (publicada)"
+    grande = analise.pontuar(Vaga(id="t:b2", fonte="gupy", empresa="Syngenta", titulo="Estágio em Qualidade",
+                                  cidade="Paulínia", tipo="vacancy_type_internship", descricao="Cursando Engenharia."),
+                             CFG, HOJE)
+    assert grande.bolsa_estimada == "R$ 2.200 a 3.000 (estimativa)"
+    meio = analise.pontuar(Vaga(id="t:b3", fonte="gupy", empresa="Loja Y", titulo="Estágio administrativo",
+                                cidade="Campinas", tipo="vacancy_type_internship",
+                                descricao="Cursando Administração. Jornada de 20 horas semanais."), CFG, HOJE)
+    assert meio.bolsa_estimada == "R$ 1.000 a 1.400 (estimativa)"

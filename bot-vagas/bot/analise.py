@@ -38,6 +38,49 @@ def extrair_carga(desc_n: str) -> tuple[str, int | None]:
     return "não informada", None
 
 
+# Reference (Companhia de Estágios, 2026): Southeast average R$ 2.009 for 30h/week. Big programs
+# published this season paid R$ 2.000 to 3.300 (Embraer 2.000, Boticário 2.300, Samsung 2.500, Blip 3.300).
+FAIXA_GRANDE = (2200, 3000)
+FAIXA_OUTRAS = (1500, 2100)
+TECH = ["dados", "data", "analytics", "tecnologia", "software", "ti ", "sistemas", "inteligencia artificial",
+        " ia ", "desenvolvimento", "engenharia de dados", "machine learning", "produto"]
+
+
+def _reais(x: float) -> str:
+    return f"{int(round(x / 100.0) * 100):,}".replace(",", ".")
+
+
+def bolsa_publicada(desc: str) -> int | None:
+    """Value in R$ written near 'bolsa'/'remuneração'/'salário' (first plausible one)."""
+    for m in re.finditer(r"(?i)(bolsa|remunera|sal[aá]rio)[^\n]{0,50}?R\$\s?([\d\.]+)(?:,\d{2})?", desc or ""):
+        try:
+            valor = int(m.group(2).replace(".", ""))
+        except ValueError:
+            continue
+        if 500 <= valor <= 15000:
+            return valor
+    return None
+
+
+def estimar_bolsa(v: Vaga, grande: bool, eh_estagio: bool) -> str:
+    """Published value when there is one; otherwise a rough range for internships."""
+    pub = bolsa_publicada(v.descricao)
+    if pub:
+        return f"R$ {_reais(pub)} (publicada)"
+    if not eh_estagio:
+        return ""
+    lo, hi = FAIXA_GRANDE if grande else FAIXA_OUTRAS
+    texto = f" {norm(v.titulo)} {norm(v.descricao[:600])} "
+    if any(t in texto for t in TECH):
+        lo, hi = lo + 300, hi + 300
+    if norm(v.cidade).startswith("sao paulo"):
+        lo, hi = lo + 200, hi + 200
+    if v.horas_semana and v.horas_semana < 30:
+        f = v.horas_semana / 30
+        lo, hi = lo * f, hi * f
+    return f"R$ {_reais(lo)} a {_reais(hi)} (estimativa)"
+
+
 def extrair_bolsa(desc: str) -> str:
     achados = []
     m = re.search(r"(?i)(bolsa[^\n]{0,40}?R\$\s?[\d\.]+(?:,\d{2})?|R\$\s?[\d\.]+(?:,\d{2})?[^\n]{0,15}bolsa)", desc)
@@ -61,20 +104,30 @@ CURSO_ABERTO = ["todos os cursos", "qualquer curso", "qualquer area de formacao"
                 "exatas", "areas correlatas", "cursos correlatos", "areas afins", "stem"]
 
 
+FLEXIVEL = ["horario flexivel", "horarios flexiveis", "flexibilidade de horario", "flexibilidade de horarios",
+            "jornada flexivel", "carga horaria flexivel", "horario a combinar", "voce monta seu horario",
+            "flexible hours", "flexible schedule"]
+TETO_SEM_ENGENHARIA = 79
+
+
 def extrair_cursos(desc_n: str) -> tuple[str, str]:
     """(texto para planilha, categoria: explicito|amplo|aberto|lista|desconhecido)."""
     if contains_any(desc_n, CURSO_EXPLICITO):
         return "Engenharia Agrícola citada", "explicito"
     if contains_any(desc_n, CURSO_AMPLO):
         return "Engenharias em geral", "amplo"
+    sem_areas = re.sub(r"engenharia de (dados|prompt|machine learning|ia)|engenheir[oa] de dados", " ", desc_n)
+    if re.search(r"\beng(?:enharias?\b|\.\s)", sem_areas):  # "Engenharia de Produção", "Eng. de Controle"...
+        return "Engenharia citada entre os cursos", "amplo"
     if contains_any(desc_n, CURSO_ABERTO):
         return "Cursos abertos/exatas/afins", "aberto"
-    m = re.search(r"(?:cursando|graduacao em|formacao em|estudantes de|cursos?:?)\s+([^\n.;]{5,160})", desc_n)
-    if m:
-        trecho = m.group(1).strip()
-        if "engenharia" in trecho:
+    trechos = [m.group(1).strip() for m in
+               re.finditer(r"(?:cursando|graduacao em|formacao em|estudantes de|cursos?:?)\s+([^\n.;]{5,160})", desc_n)]
+    for trecho in trechos:  # any course list that names engineering counts
+        if "engenharia" in trecho or "engineering" in trecho:
             return f"Engenharia (lista: {trecho[:100]})", "amplo"
-        return f"Lista sem Eng. Agrícola: {trecho[:100]}", "lista"
+    if trechos:
+        return f"Lista sem Eng. Agrícola: {trechos[0][:100]}", "lista"
     return "não especificado", "desconhecido"
 
 
@@ -293,23 +346,29 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
         bonus, porque = bonus + 5, porque + ["empresa grande/programa"]
     if mod == "remoto":
         bonus, porque = bonus + 5, porque + ["100% remoto"]
-    if contains_any(desc_n, ["horario flexivel", "horarios flexiveis", "flexibilidade de horario"]):
+    flexivel = contains_any(desc_n, FLEXIVEL)
+    if flexivel:
         bonus, porque = bonus + 2, porque + ["horário flexível"]
     if bonus:
         detalhes.append(f"Prioridade +{bonus} ({', '.join(porque)})")
 
     v.nota = min(100, p_ativ + p_curso + p_loc + p_jor + p_apr + bonus)
-    # Nu: ANY 100% remote internship is worth ~90. Course or graduation mismatches stay visible
-    # in the alerts and in "Por que essa nota?", but don't pull the score below 90.
-    if mod == "remoto" and eh_estagio:
-        piso = 90
+    # Nu's priority: remote internships that accept engineering, best if hours are flexible.
+    # Jobs that don't cite engineering are not a priority: they stay below every job that does.
+    cita_eng = cat in ("explicito", "amplo")
+    if mod == "remoto" and eh_estagio and cita_eng:
+        piso = 95 if flexivel else 90
         if v.nota < piso:
-            detalhes.append(f"Piso de estágio 100% remoto: {piso}")
+            detalhes.append(f"Piso de estágio remoto que aceita engenharia{' e é flexível' if flexivel else ''}: {piso}")
             v.nota = piso
+    if not cita_eng and v.nota > TETO_SEM_ENGENHARIA:
+        detalhes.append(f"Não cita engenharia: nota limitada a {TETO_SEM_ENGENHARIA}")
+        v.nota = TETO_SEM_ENGENHARIA
     v.detalhe_nota = " | ".join(detalhes)
 
     # --- outros dados
     v.bolsa_beneficios = extrair_bolsa(v.descricao)
+    v.bolsa_estimada = estimar_bolsa(v, grande_ou_programa, eh_estagio)
     if v.prazo:
         try:
             if datetime.strptime(v.prazo, "%Y-%m-%d").date() < hoje:

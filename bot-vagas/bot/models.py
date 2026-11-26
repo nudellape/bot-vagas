@@ -36,3 +36,4 @@ class Vaga:
     alertas_gerais: list[str] = field(default_factory=list)
     pts_aprendizado: int = 0
     trecho_cursos: str = ""      # trechos da descrição que falam de cursos aceitos
+    bolsa_estimada: str = ""     # "R$ 3.300 (publicada)" or "R$ 2.200 a 3.000 (estimativa)"

@@ -52,6 +52,7 @@ def _dados(linhas: list[dict], novas_ids: set[str], empresas: list[dict], agora:
             "areas": [a for a in str(r.get("Áreas", "") or "").split("; ") if a],
             "trecho": str(r.get("Trecho", "") or ""),
             "trecho_cursos": str(r.get("Trecho cursos", "") or ""),
+            "bolsa_estimada": str(r.get("Bolsa estimada", "") or ""),
             "alertas_gerais": [a for a in str(r.get("Alertas gerais", "") or "").split(" | ") if a],
             "pts_aprendizado": _int(r.get("Pts aprendizado")) or 4,
             # pontos por critério, para o app mostrar "Por que essa nota?"
