@@ -3,7 +3,7 @@
 Regras de atualização (o histórico nunca é apagado):
 - Vaga nova           -> entra com Status = "nova" e Data da descoberta = hoje.
 - Vaga já registrada  -> atualiza dados e "Última vez vista"; NÃO mexe em
-                         Status nem em Minhas notas (colunas da Nu).
+                         Status nem em Minhas notas (colunas de Nu).
 - Vaga que sumiu da fonte (e a fonte foi consultada sem erro)
                       -> Verificação = "não listada na fonte desde <data>".
                          Se o Status era "nova"/"analisar", vira "encerrada".

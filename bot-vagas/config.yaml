@@ -53,15 +53,15 @@ busca:
                                  "fluxo de caixa", tesouraria, faturamento, "contas a pagar", "contas a receber",
                                  estoque, inventário, inventario, "planejamento de demanda", "plan"]
   # Títulos com estes termos são descartados (cargo acima do nível de entrada ou fora do alvo)
-  # Empresas que a Nu não quer (vale também para vagas publicadas por recrutadoras)
+  # Empresas que Nu não quer (vale também para vagas publicadas por recrutadoras)
   excluir_empresas: [bosch, eureca]   # "eureca": comunidade de talentos da própria plataforma, não é vaga
   excluir_titulos: [pleno, sênior, senior, " sr ", " sr.", " pl ", " pl |", " pl -", " ii ", " iii ", especialista, coordenador, coordenadora,
                     gerente, supervisor, supervisora, líder, lider, diretor, diretora, head,
                     "jovem aprendiz", aprendiz, "pcd exclusiva",
-                    # cursos que não são da Nu:
+                    # cursos que não são de Nu:
                     odontologia, enfermagem, medicina, "direito ", jurídico, juridico, farmácia, farmacia,
                     psicologia, pedagogia, "educação física", nutrição, nutricao, veterinária, fisioterapia,
-                    # fora do perfil (a Nu pediu para nunca mostrar):
+                    # fora do perfil (Nu pediu para nunca mostrar):
                     manobrista, motorista, motoboy, entregador, atendente, recepcionista,
                     vendedor, vendedora, "consultor de vendas", "consultora de vendas",
                     "representante comercial", promotor, promotora, repositor, repositora,
@@ -75,7 +75,7 @@ busca:
 
   # Gupy: buscas nacionais para vagas REMOTAS (prioridade 3).
   # Todo estágio 100% remoto do Brasil (termos amplos + filtro de remoto da Gupy).
-  # A Nu quer TODOS os estágios remotos no site.
+  # Nu quer TODOS os estágios remotos no site.
   gupy_termos_estagio_remoto: ["estágio", "estagiário", "estagiária", "estágio remoto", "estágio home office", "estagio 100% remoto"]
   max_paginas_remoto: 40
 

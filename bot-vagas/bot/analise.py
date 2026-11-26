@@ -1,6 +1,6 @@
 """Extração de informações do texto da vaga e nota de compatibilidade (0-100).
 
-Rubrica (definida pela Nu):
+Rubrica (definida por Nu):
   30 atividades x experiências/interesses
   25 elegibilidade do curso e requisitos acadêmicos
   20 localização e modalidade
@@ -183,7 +183,7 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
     grande_ou_programa = empresa_grande(v, cfg) or "programa de estagio" in titulo_n
     if p_ativ == 8 and grande_ou_programa:
         p_ativ, motivo = 18, "programa/empresa grande: área escolhida depois (trilhas)"
-    # bônus por ferramentas que a Nu domina
+    # bônus por ferramentas que Nu domina
     ferramentas = contains_any(desc_n, ["excel", "power bi", "python", "sql", "power query", "dashboards"])
     if ferramentas and p_ativ < 30:
         p_ativ = min(30, p_ativ + 2 * len(ferramentas))
@@ -216,7 +216,7 @@ def pontuar(v: Vaga, cfg: dict, hoje: date | None = None) -> Vaga:
         gerais.append(f"Pede formatura entre {amin} e {amax}." if amin != amax else f"Pede formatura em {amin}.")
         if ano_nu > amax:
             p_curso = max(0, p_curso - 12)
-            alertas.append(f"Exige formatura até {amax}; a previsão da Nu é {cfg['perfil']['formatura']}.")
+            alertas.append(f"Exige formatura até {amax}; a formatura de Nu está prevista para {cfg['perfil']['formatura']}.")
         elif ano_nu < amin:
             alertas.append(f"Pede formatura a partir de {amin}; confirmar elegibilidade.")
         else:

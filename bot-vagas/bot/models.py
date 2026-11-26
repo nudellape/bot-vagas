@@ -28,7 +28,7 @@ class Vaga:
     detalhe_nota: str = ""
     alertas: list[str] = field(default_factory=list)
     recente: bool = False
-    # dados neutros (sem nada do perfil da Nu), para outros apps calcularem nota pessoal
+    # dados neutros (sem nada do perfil de Nu), para outros apps calcularem nota pessoal
     horas_semana: int | None = None
     curso_categoria: str = ""        # explicito | amplo | aberto | lista | desconhecido
     formatura_exigida: str = ""      # "2027-2028" ou ""

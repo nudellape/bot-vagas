@@ -135,7 +135,7 @@ def test_fluxo_completo_csv(tmp_path, monkeypatch):
     por_id = {r["ID"]: r for r in reg.ler()}
 
     assert [r["ID"] for r in novas2] == ["gupy:15"]                       # só a nova é alertada
-    assert por_id["gupy:14"]["Status"] == "candidatura enviada"           # status da Nu preservado
+    assert por_id["gupy:14"]["Status"] == "candidatura enviada"           # status de Nu preservado
     assert por_id["gupy:14"]["Minhas notas"] == "enviei dia 17"
     assert por_id["gupy:14"]["Verificação"].startswith("não listada")
     assert por_id["gupy:10"]["Data da descoberta"] == "2026-11-17"        # descoberta original mantida
@@ -327,7 +327,7 @@ def test_dados_neutros_no_json(tmp_path):
     analise.pontuar(v, CFG, HOJE)
     assert v.horas_semana == 40 and v.curso_categoria == "amplo" and v.formatura_exigida == "2027-2028"
     assert {"Dados e BI", "Qualidade", "Planejamento e projetos", "Processos e melhoria contínua"} <= set(v.areas)
-    assert all("2028" not in a or "Pede formatura" in a for a in v.alertas_gerais)   # nada do perfil da Nu
+    assert all("2028" not in a or "Pede formatura" in a for a in v.alertas_gerais)   # nada do perfil de Nu
     assert not any("dez/2028" in a for a in v.alertas_gerais)
     linha = registro.vaga_para_linha(v, "2026-11-17")
     linha["Status"] = "nova"

@@ -1,6 +1,6 @@
 """Fonte: alertas de vaga que chegam por e-mail (Glassdoor e Indeed).
 
-Um Google Apps Script no Gmail da Nu (extras/alertas_email.gs) lê esses e-mails todo dia
+Um Google Apps Script no Gmail de Nu (extras/alertas_email.gs) lê esses e-mails todo dia
 e escreve uma linha por vaga na aba "Alertas e-mail" da planilha do robô:
     ID | Fonte | Vaga | Empresa | Cidade | Link | Recebido em
 Esta fonte só lê essa aba. As vagas passam pelos mesmos filtros (região, área, janela)
