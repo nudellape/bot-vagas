@@ -214,6 +214,11 @@ vigia:
   - {nome: "Raízen: Programa de Estágio", cidade: "Paulínia e outras", url: "https://estagioraizen.com/"}
   - {nome: "Syngenta: vagas", cidade: "Paulínia", url: "https://jobs.syngenta.com/"}
   - {nome: "Solvay: vagas", cidade: "Paulínia", url: "https://careers.solvay.com/"}
+  # Sites que juntam programas de estágio de empresas grandes (muitos via Eureca, Cia de Talentos, 99jobs, Across).
+  # A lista da Eureca só aparece com login; estes publicam os mesmos programas em páginas abertas.
+  - {nome: "EstágioTrainee.com: programas abertos", cidade: "Brasil", url: "https://www.estagiotrainee.com/"}
+  - {nome: "Academia do Universitário: programas abertos", cidade: "Brasil", url: "https://www.academiadouniversitario.com.br/blog/programas-de-estagio-inscricoes-abertas"}
+  - {nome: "Na Prática: vagas de estágio e trainee", cidade: "Brasil", url: "https://napratica.org.br/noticias/"}
 
 # ---------------------------------------------------------------------
 # Pontuação (rubrica do prompt: 30/25/20/15/10)
@@ -263,3 +268,24 @@ programas_destaque:
     cidade: "São Paulo"
     prazo: ""
     descricao: "Cursando Administração, Ciência da Computação, Engenharia, Gestão, TI, Sistemas de Informação ou áreas afins. Desejável Excel (PROCV, PROCX, tabela dinâmica) e interesse em dados e indicadores; diferenciais AWS e IA/automação. Local e modelo não informados."
+  - empresa: ACCIONA
+    titulo: "nexTalent 2027: Programa de Estágio ACCIONA"
+    link: "https://www.acciona.com.br/trabalhe-conosco/talento-jovem/programa-de-estagio"
+    modalidade: ""
+    cidade: "São Paulo"
+    prazo: "2026-12-01"
+    descricao: "Programa de estágio de empresa grande (infraestrutura e energia). Vagas em SP, PR, PB e PE. Formatura prevista entre dez/2027 e dez/2028. Inscrições até 01/12/2026."
+  - empresa: Vibra
+    titulo: "Programa de Estágio Vibra 2027"
+    link: "https://vibra.academiadouniversitario.com.br/"
+    modalidade: ""
+    cidade: "São Paulo"
+    prazo: "2026-12-10"
+    descricao: "Mais de 40 vagas; nível superior em São Paulo/SP e Rio de Janeiro. Estágio de 6h/dia. Formação prevista entre 2028.2 e 2029.1. Inscrições de 10/11 a 10/12/2026."
+  - empresa: IFF
+    titulo: "Programa de Estágio IFF 2027.1"
+    link: "https://blog.pensarcursos.com.br/iff-abre-inscricoes-para-o-programa-de-estagio-2027-com-vagas-em-seis-cidades-ate-13-de-dezembro/"
+    modalidade: ""
+    cidade: "São Paulo"
+    prazo: "2026-12-13"
+    descricao: "Multinacional de ingredientes. Vagas em SP, RJ, MG e RS, híbrido ou presencial (confira a vaga). Seleção pela Companhia de Estágios. Início em maio de 2027."
