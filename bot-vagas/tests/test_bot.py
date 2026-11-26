@@ -107,18 +107,18 @@ def test_fluxo_completo_csv(tmp_path, monkeypatch):
         job(10, "Estágio em Melhoria Contínua", desc="Engenharias. 6 horas por dia."),       # duplicata
         job(11, "Analista de Dados Pleno", tipo="vacancy_type_effective"),                     # não é estágio
         job(12, "Estágio em Logística", city="Recife", wt="on-site"),                          # fora da região
-        job(13, "Estágio Sustentabilidade", pub="2026-09-01"),                                 # fora da janela
+        job(13, "Estágio Sustentabilidade", pub="2026-09-01"),                                 # antiga, mas a Gupy só lista abertas: entra
         job(14, "Estágio em Operações", city="Paulínia", wt="on-site", desc="30 horas semanais."),
     ]
     brutas, erros, ok = main.coletar_tudo(CFG, FakeSession(jobs))
     assert erros == [] and "gupy:" in ok
     vagas, ids = main.processar(brutas, CFG, HOJE)
-    assert sorted(v.id for v in vagas) == ["gupy:10", "gupy:14"]
+    assert sorted(v.id for v in vagas) == ["gupy:10", "gupy:13", "gupy:14"]
 
     reg = registro.abrir_registro()
     linhas, novas, mud = registro.mesclar(reg.ler(), vagas, ok, "2026-11-17", ids)
     reg.gravar(linhas)
-    assert len(novas) == 2 and all(r["Status"] == "nova" for r in novas)
+    assert len(novas) == 3 and all(r["Status"] == "nova" for r in novas)
 
     # Nu marca uma candidatura; no dia seguinte a vaga 14 some e a 10 continua
     lidas = reg.ler()
